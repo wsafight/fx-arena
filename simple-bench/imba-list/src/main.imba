@@ -9,12 +9,10 @@ let selectedId = -1
 
 tag app
 	<self>
-		<table>
-			<tbody>
-				for row in rows
-					<tr .selected=(row.id == selectedId)>
-						<td> row.id
-						<td> row.label
+		<ul>
+			for row in rows
+				<li .selected=(row.id == selectedId)>
+					"{row.id} {row.label}"
 
 imba.mount <app>
 

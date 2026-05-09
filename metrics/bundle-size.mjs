@@ -1,7 +1,7 @@
 import { readdir, readFile, writeFile, mkdir, stat } from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gzipSync } from 'node:zlib';
+import { gzipSync, brotliCompressSync } from 'node:zlib';
 import { FRAMEWORKS } from '../bench/scenarios.mjs';
 
 const __root = fileURLToPath(new URL('..', import.meta.url));
@@ -20,16 +20,18 @@ async function walk(dir, acc = []) {
 
 async function measureDir(dist) {
   const files = await walk(dist);
-  let raw = 0, gz = 0;
+  let raw = 0, gz = 0, br = 0;
   const perFile = [];
   for (const f of files) {
     const buf = await readFile(f);
     const g = gzipSync(buf, { level: 9 }).length;
+    const b = brotliCompressSync(buf).length;
     raw += buf.length;
     gz += g;
-    perFile.push({ path: relative(dist, f), raw: buf.length, gz: g });
+    br += b;
+    perFile.push({ path: relative(dist, f), raw: buf.length, gz: g, br: b });
   }
-  return { raw, gz, files: perFile };
+  return { raw, gz, br, files: perFile };
 }
 
 async function exists(p) { try { await stat(p); return true; } catch { return false; } }
@@ -50,7 +52,7 @@ async function main() {
   await writeFile(OUT, JSON.stringify(out, null, 2));
   console.log('wrote', OUT);
   for (const [k, v] of Object.entries(simple)) {
-    console.log(`  ${k}: ${(v.raw/1024).toFixed(1)} KB raw, ${(v.gz/1024).toFixed(1)} KB gzip`);
+    console.log(`  ${k}: ${(v.raw/1024).toFixed(1)} KB raw, ${(v.gz/1024).toFixed(1)} KB gzip, ${(v.br/1024).toFixed(1)} KB br`);
   }
 }
 

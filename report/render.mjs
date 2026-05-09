@@ -28,10 +28,11 @@ function noisy(s) {
 function renderBundleTable(bundle, t) {
   if (!bundle?.simple) return '';
   const ids = FRAMEWORKS.map(f => f.id).filter(id => bundle.simple[id]);
-  let out = `<table class="bench"><thead><tr><th>${esc(t.bundleFramework)}</th><th>${esc(t.bundleRaw)}</th><th>${esc(t.bundleGzip)}</th></tr></thead><tbody>`;
+  ids.sort((a, b) => bundle.simple[b].raw - bundle.simple[a].raw);
+  let out = `<table class="bench"><thead><tr><th>${esc(t.bundleFramework)}</th><th>${esc(t.bundleRaw)}</th><th>${esc(t.bundleGzip)}</th><th>${esc(t.bundleBr)}</th></tr></thead><tbody>`;
   for (const id of ids) {
     const b = bundle.simple[id];
-    out += `<tr><td>${esc(id)}</td><td>${fmtKB(b.raw)}</td><td>${fmtKB(b.gz)}</td></tr>`;
+    out += `<tr><td>${esc(id)}</td><td>${fmtKB(b.raw)}</td><td>${fmtKB(b.gz)}</td><td>${fmtKB(b.br)}</td></tr>`;
   }
   return out + '</tbody></table>';
 }
@@ -94,11 +95,12 @@ const I18N = {
     downloadRaw: 'download raw JSON',
     intro: (n) => `List-bench only (phase 1). Lower is better. P50 / P95 over ${n} samples with 10% trim; first runs discarded as warm-up. See <a href="https://github.com/wsafight/fx-arena">wsafight/fx-arena</a> for the source and the full design doc.`,
     bundleHead: 'Bundle size',
-    bundleLegend: `raw + gzip of every <code>.js</code>/<code>.css</code> under <code>dist/</code>. A framework's production cost on first load.`,
+    bundleLegend: `raw + gzip + brotli of every <code>.js</code>/<code>.css</code> under <code>dist/</code>. A framework's production cost on first load.`,
     bundleNote: `Ripple's number reflects a project-level workaround: the upstream <code>@tsrx/core</code> barrel has side-effect imports that defeat tree-shaking and leak the compiler (~450 KB of acorn + TS parser + tsrx plugin) into the client bundle. We alias <code>@tsrx/core</code> to a local shim that re-exports only the 7 symbols the runtime needs — the stock build would be ~283 KB raw / ~80 KB gzip. See <a href="https://github.com/wsafight/fx-arena/blob/main/VERSIONS.md">VERSIONS.md</a> for details. Raw JSON: <a href="bundle-size.json">bundle-size.json</a>`,
     bundleFramework: 'framework',
     bundleRaw: 'raw (KB)',
     bundleGzip: 'gzip (KB)',
+    bundleBr: 'br (KB)',
     resultsHead: 'Results',
     resultsLegend: (th) => `Yellow cells (⚠) have <code>iqr/p50 &gt; ${th}</code> — the middle 50% of samples spans more than ${th*100}% of the median, so the number is too noisy to compare precisely on a single-runner CI. Hover a cell for the raw spread.`,
     colScenario: 'scenario',
@@ -116,11 +118,12 @@ const I18N = {
     downloadRaw: '下载原始 JSON',
     intro: (n) => `仅简单列表基准（Phase 1）。数值越低越好。每场景 ${n} 次采样，去除两端各 10% 后取 P50 / P95；首轮作为预热丢弃。源码与完整方案见 <a href="https://github.com/wsafight/fx-arena">wsafight/fx-arena</a>。`,
     bundleHead: '打包体积',
-    bundleLegend: `各端 <code>dist/</code> 下所有 <code>.js</code> / <code>.css</code> 的原始体积与 gzip 体积，代表"首屏加载代价"。`,
+    bundleLegend: `各端 <code>dist/</code> 下所有 <code>.js</code> / <code>.css</code> 的原始体积、gzip 与 brotli 体积，代表"首屏加载代价"。`,
     bundleNote: `Ripple 的数字是项目级 workaround 后的值：上游 <code>@tsrx/core</code> barrel 存在副作用 import（acorn、TS parser、tsrx 编译插件），导致 tree-shake 失效，编译器本身（约 450 KB）泄漏到浏览器 bundle。我们在 <code>vite.config.js</code> 中用 alias 把 <code>@tsrx/core</code> 重定向到一个只导出运行时实际需要 7 个符号的 shim。默认构建下这个数字会是 ~283 KB raw / ~80 KB gzip。详情见 <a href="https://github.com/wsafight/fx-arena/blob/main/VERSIONS.md">VERSIONS.md</a>。原始 JSON：<a href="bundle-size.json">bundle-size.json</a>。`,
     bundleFramework: '框架',
     bundleRaw: '原始 (KB)',
     bundleGzip: 'gzip (KB)',
+    bundleBr: 'br (KB)',
     resultsHead: '结果',
     resultsLegend: (th) => `黄色单元格（⚠）表示 <code>iqr/p50 &gt; ${th}</code>——中间 50% 样本的跨度超过中位数的 ${th*100}%，单机 CI 下该数字不够稳定，不能精确对比。悬停单元格可看原始离散度。`,
     colScenario: '场景',

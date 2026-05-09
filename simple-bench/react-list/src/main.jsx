@@ -16,13 +16,13 @@ function App() {
   apiRef.current = { setRows, setSelectedId, getRows: () => rows };
 
   return (
-    <table><tbody>
+    <ul>
       {rows.map((row) => (
-        <tr key={row.id} className={row.id === selectedId ? 'selected' : ''}>
-          <td>{row.id}</td><td>{row.label}</td>
-        </tr>
+        <li key={row.id} className={row.id === selectedId ? 'selected' : ''}>
+          {row.id} {row.label}
+        </li>
       ))}
-    </tbody></table>
+    </ul>
   );
 }
 

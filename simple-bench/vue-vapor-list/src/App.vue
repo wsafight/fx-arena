@@ -32,9 +32,9 @@ onMounted(() => { window.__simpleBench.ready = true; });
 </script>
 
 <template>
-  <table><tbody>
-    <tr v-for="row in rows" :key="row.id" :class="row.id === selectedId ? 'selected' : ''">
-      <td>{{ row.id }}</td><td>{{ row.label }}</td>
-    </tr>
-  </tbody></table>
+  <ul>
+    <li v-for="row in rows" :key="row.id" :class="row.id === selectedId ? 'selected' : ''">
+      {{ row.id }} {{ row.label }}
+    </li>
+  </ul>
 </template>

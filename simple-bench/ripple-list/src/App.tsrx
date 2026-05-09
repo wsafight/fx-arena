@@ -33,14 +33,11 @@ export component App() {
   };
   (globalThis as any).__simpleBench = api;
 
-  <table>
-    <tbody>
-      for (const row of rows; key row.id) {
-        <tr class={row.id === selectedId ? 'selected' : ''}>
-          <td>{row.id}</td>
-          <td>{row.label}</td>
-        </tr>
-      }
-    </tbody>
-  </table>
+  <ul>
+    for (const row of rows; key row.id) {
+      <li class={row.id === selectedId ? 'selected' : ''}>
+        {row.id} {row.label}
+      </li>
+    }
+  </ul>
 }

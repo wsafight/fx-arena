@@ -35,12 +35,10 @@
   window.__simpleBench = api;
 </script>
 
-<table>
-  <tbody>
-    {#each rows as row (row.id)}
-      <tr class={row.id === selectedId ? 'selected' : ''}>
-        <td>{row.id}</td><td>{row.label}</td>
-      </tr>
-    {/each}
-  </tbody>
-</table>
+<ul>
+  {#each rows as row (row.id)}
+    <li class={row.id === selectedId ? 'selected' : ''}>
+      {row.id} {row.label}
+    </li>
+  {/each}
+</ul>
