@@ -2,29 +2,34 @@
   import { flushSync } from 'svelte';
   import { buildRows, resetIds } from '../../shared/data.js';
 
+  // Selection by id, not index — avoids rows re-evaluating `i === selected`
+  // when their index shifts (remove/swap) and lets Svelte's keyed each
+  // block touch exactly one old + one new row on select().
   let rows = $state([]);
-  let selected = $state(-1);
+  let selectedId = $state(-1);
 
   const api = {
     ready: true,
-    run(n) { flushSync(() => { resetIds(); selected = -1; rows = buildRows(n); }); },
+    run(n) { flushSync(() => { resetIds(); selectedId = -1; rows = buildRows(n); }); },
     append(n) { flushSync(() => { rows = rows.concat(buildRows(n)); }); },
     updateEvery10th() {
       flushSync(() => {
-        for (let i = 0; i < rows.length; i += 10) {
-          rows[i] = { ...rows[i], label: rows[i].label + ' !!!' };
-        }
+        const next = rows.slice();
+        for (let i = 0; i < next.length; i += 10) next[i] = { ...next[i], label: next[i].label + ' !!!' };
+        rows = next;
       });
     },
-    select(i) { flushSync(() => { selected = i; }); },
+    select(i) { flushSync(() => { selectedId = rows[i]?.id ?? -1; }); },
     swap() {
       flushSync(() => {
         if (rows.length < 999) return;
-        const a = rows[1]; rows[1] = rows[rows.length - 2]; rows[rows.length - 2] = a;
+        const next = rows.slice();
+        const a = next[1]; next[1] = next[next.length - 2]; next[next.length - 2] = a;
+        rows = next;
       });
     },
     remove(i) { flushSync(() => { rows = rows.filter((_, k) => k !== i); }); },
-    clear() { flushSync(() => { rows = []; selected = -1; }); },
+    clear() { flushSync(() => { rows = []; selectedId = -1; }); },
     count() { return rows.length; }
   };
   window.__simpleBench = api;
@@ -32,8 +37,8 @@
 
 <table>
   <tbody>
-    {#each rows as row, i (row.id)}
-      <tr class={i === selected ? 'selected' : ''}>
+    {#each rows as row (row.id)}
+      <tr class={row.id === selectedId ? 'selected' : ''}>
         <td>{row.id}</td><td>{row.label}</td>
       </tr>
     {/each}
