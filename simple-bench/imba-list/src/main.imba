@@ -1,7 +1,9 @@
 import { buildRows, resetIds } from '../../shared/data.js'
 
-# Selection by id, not index — in-place-shifting ops don't force every
-# row template to re-evaluate its .selected binding.
+# Imba's scheduler batches DOM writes to the next rAF tick. `imba.commit!`
+# returns a promise that resolves after the commit actually runs, so each
+# hook awaits it — the runner's timing window then covers the real DOM
+# writes, not just the enqueue.
 let rows = []
 let selectedId = -1
 
@@ -22,10 +24,10 @@ global.__simpleBench = {
 		resetIds!
 		selectedId = -1
 		rows = buildRows(n)
-		imba.commit!
+		await imba.commit!
 	append: do(n)
 		rows = rows.concat(buildRows(n))
-		imba.commit!
+		await imba.commit!
 	updateEvery10th: do
 		let next = rows.slice!
 		let i = 0
@@ -33,10 +35,10 @@ global.__simpleBench = {
 			next[i] = Object.assign({}, next[i], { label: next[i].label + ' !!!' })
 			i += 10
 		rows = next
-		imba.commit!
+		await imba.commit!
 	select: do(i)
 		selectedId = (rows[i] and rows[i].id) or -1
-		imba.commit!
+		await imba.commit!
 	swap: do
 		if rows.length >= 999
 			let next = rows.slice!
@@ -44,13 +46,13 @@ global.__simpleBench = {
 			next[1] = next[next.length - 2]
 			next[next.length - 2] = tmp
 			rows = next
-			imba.commit!
+			await imba.commit!
 	remove: do(i)
 		rows = rows.filter(do(_, k) k != i)
-		imba.commit!
+		await imba.commit!
 	clear: do
 		rows = []
 		selectedId = -1
-		imba.commit!
+		await imba.commit!
 	count: do rows.length
 }

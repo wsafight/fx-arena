@@ -15,17 +15,20 @@ async function runOne(page, setupFn, runFn) {
     const b = window.__simpleBench;
     if (!b || !b.ready) throw new Error('__simpleBench not ready');
     // eslint-disable-next-line no-new-func
-    (new Function('b', `return (${setupSrc})(b)`))(b);
+    await (new Function('b', `return (${setupSrc})(b)`))(b);
     // Settle the DOM from setup work so it doesn't leak into the measurement.
     document.body.getBoundingClientRect();
     if (window.gc) window.gc();
     const t0 = performance.now();
+    // `run` may be sync (React/Svelte/Ripple flushSync) or async (Imba's
+    // imba.commit returns a Promise resolved when DOM is flushed). Either
+    // way we await it so frameworks with a microtask-batched scheduler
+    // are measured honestly — not at zero because DOM writes haven't
+    // happened yet.
     // eslint-disable-next-line no-new-func
-    (new Function('b', `return (${runSrc})(b)`))(b);
+    await (new Function('b', `return (${runSrc})(b)`))(b);
     // Force style + layout into the measurement window. No rAF — that
-    // would quantise sub-frame operations to ~16.7 ms frame boundaries
-    // and flatten real differences. Paint happens after t1 and is
-    // approximately equal across frameworks for the same DOM shape.
+    // would quantise sub-frame operations to ~16.7 ms frame boundaries.
     document.body.getBoundingClientRect();
     const t1 = performance.now();
     window.__lastSample = t1 - t0;
