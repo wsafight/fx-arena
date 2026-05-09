@@ -39,14 +39,13 @@ function renderBundleTable(bundle, t) {
 
 function renderTable(summary, t) {
   const ids = FRAMEWORKS.map(f => f.id).filter(id => summary.simple?.[id]);
-  ids.sort((a, b) => {
-    const score = (id) => SCENARIOS.reduce((sum, sc) => {
-      const vals = ids.map(i => summary.simple[i][sc.id]?.p50 ?? Infinity);
-      const sorted = [...vals].sort((x, y) => x - y);
-      return sum + sorted.indexOf(summary.simple[id][sc.id]?.p50 ?? Infinity) + 1;
-    }, 0);
-    return score(a) - score(b);
-  });
+  const n = ids.length;
+  const getScore = (id) => SCENARIOS.reduce((sum, sc) => {
+    const vals = ids.map(i => summary.simple[i][sc.id]?.p50 ?? Infinity);
+    const sorted = [...vals].sort((x, y) => x - y);
+    return sum + n - sorted.indexOf(summary.simple[id][sc.id]?.p50 ?? Infinity);
+  }, 0);
+  ids.sort((a, b) => getScore(b) - getScore(a));
   let out = `<table class="bench"><thead><tr><th>${esc(t.colScenario)}</th>`;
   for (const id of ids) out += `<th>${esc(t.colHead(id))}</th>`;
   out += '</tr></thead><tbody>';
@@ -60,6 +59,11 @@ function renderTable(summary, t) {
     }
     out += '</tr>';
   }
+  out += `<tr class="score-row"><td>${esc(t.scoreLabel)} <span class="score-help" data-tip="${esc(t.scoreTooltip)}">?</span></td>`;
+  for (const id of ids) {
+    out += `<td><strong>${getScore(id)}</strong></td>`;
+  }
+  out += '</tr>';
   return out + '</tbody></table>';
 }
 
@@ -131,6 +135,8 @@ const I18N = {
     resultsLegend: (th) => `Yellow cells (⚠) have <code>iqr/p50 &gt; ${th}</code> — the middle 50% of samples spans more than ${th*100}% of the median, so the number is too noisy to compare precisely on a single-runner CI. Hover a cell for the raw spread.`,
     colScenario: 'scenario',
     colHead: (id) => `${id} P50 / P95 (ms)`,
+    scoreLabel: 'score',
+    scoreTooltip: 'Per scenario: fastest gets N points (N = number of frameworks), slowest gets 1. Higher total = better overall.',
     chartsHead: 'P50 per scenario',
     chartCaption: (id) => `${id} — P50`
   },
@@ -154,6 +160,8 @@ const I18N = {
     resultsLegend: (th) => `黄色单元格（⚠）表示 <code>iqr/p50 &gt; ${th}</code>——中间 50% 样本的跨度超过中位数的 ${th*100}%，单机 CI 下该数字不够稳定，不能精确对比。悬停单元格可看原始离散度。`,
     colScenario: '场景',
     colHead: (id) => `${id} P50 / P95 (ms)`,
+    scoreLabel: '得分',
+    scoreTooltip: '每个场景：最快得 N 分（N = 框架数），最慢得 1 分。总分越高，综合表现越好。',
     chartsHead: '各场景 P50',
     chartCaption: (id) => `${id} — P50`
   }
@@ -174,6 +182,9 @@ const STYLE = `
   table.bench tbody tr:nth-child(even):hover { background: #f0f6ff; }
   td.noisy { background: #fff8c5; }
   td.noisy::after { content: ' ⚠'; color: #9a6700; }
+  .score-row td { border-top: 2px solid #d0d7de; background: #f6f8fa; }
+  .score-help { display: inline-block; width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 50%; background: #d0d7de; color: #555; font-size: 12px; cursor: help; vertical-align: middle; position: relative; }
+  .score-help:hover::after { content: attr(data-tip); position: absolute; left: 0; bottom: 150%; background: #24292f; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px; line-height: 1.5; width: max-content; max-width: 320px; white-space: normal; z-index: 10; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
   figure { margin: 0 0 1rem; padding: 0; }
   figcaption { font-weight: 600; margin-bottom: 0.25rem; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
