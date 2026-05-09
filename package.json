@@ -1,0 +1,22 @@
+{
+  "name": "fx-arena",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Framework comparison: React / Svelte 5 / Imba / Ripple simple-bench + GitHub Pages report",
+  "workspaces": [
+    "apps/*",
+    "simple-bench/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:simple": "bun --filter='*' run build",
+    "bench:simple": "bun bench/runner.mjs --suite simple",
+    "bench": "bun run bench:simple && bun bench/aggregate.mjs",
+    "report:render": "bun report/render.mjs",
+    "clean": "rm -rf simple-bench/*/dist metrics/raw metrics/summary.json site"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1",
+    "serve-handler": "6.1.6"
+  }
+}

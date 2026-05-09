@@ -1,0 +1,16 @@
+{
+  "name": "svelte-list",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 5174 --strictPort"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "5.0.3",
+    "svelte": "5.16.0",
+    "vite": "6.0.7"
+  }
+}
