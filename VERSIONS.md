@@ -13,7 +13,7 @@ Phase 1 scope: simple-bench only.
 
 ## Ripple 0.3.x integration notes (2026-05-10)
 
-Two gotchas when bootstrapping against `@ripple-ts/vite-plugin@0.3.52`:
+Three gotchas when bootstrapping against `@ripple-ts/vite-plugin@0.3.52`:
 
 1. **Plugin export**: `import ripple from '@ripple-ts/vite-plugin'` fails to
    load (the source has duplicated `export default compat` statements that
@@ -25,6 +25,17 @@ Two gotchas when bootstrapping against `@ripple-ts/vite-plugin@0.3.52`:
    `let &[name] = track(init)` lazy-destructured tracks (read/write as
    `name`), JSX-style elements, and `for (const x of xs; index i; key x.id)`
    loops.
+3. **Bundle bloat from @tsrx/core barrel**: default production build
+   includes ~450KB of compiler (acorn + `@sveltejs/acorn-typescript` +
+   `@tsrx/core` plugin/parser) because Ripple's client runtime imports 7
+   small utility functions from the `@tsrx/core` barrel, and that barrel
+   re-exports from a parse entry with side-effectful top-level imports
+   (`import * as acorn from 'acorn'`) which Rollup can't tree-shake.
+   Worked around by aliasing `@tsrx/core` to a local shim
+   (`tsrx-core-shim.js` + vendored `tsrx-events.js`, `tsrx-css.js`) that
+   re-exports only the 7 symbols the runtime needs. Result: bundle drops
+   from 283KB / 80KB gzip → 22KB / 9KB gzip. Revisit when upstream
+   splits the barrel or marks it `sideEffects: false`.
 
-With both applied, `vite build` succeeds and produces a standard SPA
-bundle — no SSR/router plumbing required.
+With all three applied, `vite build` succeeds and produces a standard
+SPA bundle comparable in size to Svelte/Imba.

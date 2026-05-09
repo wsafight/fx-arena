@@ -25,10 +25,10 @@ function noisy(s) {
   return s && s.p50 > 0 && s.iqrRatio != null && s.iqrRatio > NOISE_THRESHOLD;
 }
 
-function renderBundleTable(bundle) {
+function renderBundleTable(bundle, t) {
   if (!bundle?.simple) return '';
   const ids = FRAMEWORKS.map(f => f.id).filter(id => bundle.simple[id]);
-  let out = '<table class="bench"><thead><tr><th>framework</th><th>raw (KB)</th><th>gzip (KB)</th></tr></thead><tbody>';
+  let out = `<table class="bench"><thead><tr><th>${esc(t.bundleFramework)}</th><th>${esc(t.bundleRaw)}</th><th>${esc(t.bundleGzip)}</th></tr></thead><tbody>`;
   for (const id of ids) {
     const b = bundle.simple[id];
     out += `<tr><td>${esc(id)}</td><td>${fmtKB(b.raw)}</td><td>${fmtKB(b.gz)}</td></tr>`;
@@ -36,10 +36,10 @@ function renderBundleTable(bundle) {
   return out + '</tbody></table>';
 }
 
-function renderTable(summary) {
+function renderTable(summary, t) {
   const ids = FRAMEWORKS.map(f => f.id).filter(id => summary.simple?.[id]);
-  let out = '<table class="bench"><thead><tr><th>scenario</th>';
-  for (const id of ids) out += `<th>${esc(id)} P50 / P95 (ms)</th>`;
+  let out = `<table class="bench"><thead><tr><th>${esc(t.colScenario)}</th>`;
+  for (const id of ids) out += `<th>${esc(t.colHead(id))}</th>`;
   out += '</tr></thead><tbody>';
   for (const sc of SCENARIOS) {
     out += `<tr><td>${esc(sc.id)}</td>`;
@@ -54,7 +54,7 @@ function renderTable(summary) {
   return out + '</tbody></table>';
 }
 
-function renderCharts(summary) {
+function renderCharts(summary, t) {
   const ids = FRAMEWORKS.map(f => f.id).filter(id => summary.simple?.[id]);
   const W = 640, BAR_H = 22, PAD_L = 140, PAD_R = 60, PAD_T = 10, PAD_B = 20;
   return SCENARIOS.map(sc => {
@@ -71,7 +71,7 @@ function renderCharts(summary) {
         <rect x="${PAD_L}" y="${y}" width="${w.toFixed(1)}" height="${BAR_H - 6}" fill="${c}" rx="2"/>
         <text x="${PAD_L + w + 6}" y="${y + BAR_H/2 + 4}" font-size="12">${fmt(b.v)} ms</text>`;
     }).join('');
-    return `<figure><figcaption>${esc(sc.id)} — P50</figcaption>
+    return `<figure><figcaption>${esc(t.chartCaption(sc.id))}</figcaption>
       <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(sc.id)} P50 bars">${rows}</svg>
     </figure>`;
   }).join('');
@@ -82,6 +82,53 @@ async function loadJson(p) {
   if (!(await exists(p))) return null;
   return JSON.parse(await readFile(p, 'utf8'));
 }
+
+const I18N = {
+  en: {
+    title: 'fx-arena — simple-bench',
+    lang: 'English',
+    other: { href: 'zh.html', label: '中文' },
+    generated: 'generated',
+    commit: 'commit',
+    runner: 'runner',
+    downloadRaw: 'download raw JSON',
+    intro: (n) => `List-bench only (phase 1). Lower is better. P50 / P95 over ${n} samples with 10% trim; first runs discarded as warm-up. See <a href="https://github.com/wsafight/fx-arena">wsafight/fx-arena</a> for the source and the full design doc.`,
+    bundleHead: 'Bundle size',
+    bundleLegend: `raw + gzip of every <code>.js</code>/<code>.css</code> under <code>dist/</code>. A framework's production cost on first load.`,
+    bundleNote: `Ripple's number reflects a project-level workaround: the upstream <code>@tsrx/core</code> barrel has side-effect imports that defeat tree-shaking and leak the compiler (~450 KB of acorn + TS parser + tsrx plugin) into the client bundle. We alias <code>@tsrx/core</code> to a local shim that re-exports only the 7 symbols the runtime needs — the stock build would be ~283 KB raw / ~80 KB gzip. See <a href="https://github.com/wsafight/fx-arena/blob/main/VERSIONS.md">VERSIONS.md</a> for details. Raw JSON: <a href="bundle-size.json">bundle-size.json</a>`,
+    bundleFramework: 'framework',
+    bundleRaw: 'raw (KB)',
+    bundleGzip: 'gzip (KB)',
+    resultsHead: 'Results',
+    resultsLegend: (th) => `Yellow cells (⚠) have <code>iqr/p50 &gt; ${th}</code> — the middle 50% of samples spans more than ${th*100}% of the median, so the number is too noisy to compare precisely on a single-runner CI. Hover a cell for the raw spread.`,
+    colScenario: 'scenario',
+    colHead: (id) => `${id} P50 / P95 (ms)`,
+    chartsHead: 'P50 per scenario',
+    chartCaption: (id) => `${id} — P50`
+  },
+  zh: {
+    title: 'fx-arena — 简单性能基准',
+    lang: '中文',
+    other: { href: 'index.html', label: 'English' },
+    generated: '生成时间',
+    commit: '提交',
+    runner: '执行机',
+    downloadRaw: '下载原始 JSON',
+    intro: (n) => `仅简单列表基准（Phase 1）。数值越低越好。每场景 ${n} 次采样，去除两端各 10% 后取 P50 / P95；首轮作为预热丢弃。源码与完整方案见 <a href="https://github.com/wsafight/fx-arena">wsafight/fx-arena</a>。`,
+    bundleHead: '打包体积',
+    bundleLegend: `各端 <code>dist/</code> 下所有 <code>.js</code> / <code>.css</code> 的原始体积与 gzip 体积，代表"首屏加载代价"。`,
+    bundleNote: `Ripple 的数字是项目级 workaround 后的值：上游 <code>@tsrx/core</code> barrel 存在副作用 import（acorn、TS parser、tsrx 编译插件），导致 tree-shake 失效，编译器本身（约 450 KB）泄漏到浏览器 bundle。我们在 <code>vite.config.js</code> 中用 alias 把 <code>@tsrx/core</code> 重定向到一个只导出运行时实际需要 7 个符号的 shim。默认构建下这个数字会是 ~283 KB raw / ~80 KB gzip。详情见 <a href="https://github.com/wsafight/fx-arena/blob/main/VERSIONS.md">VERSIONS.md</a>。原始 JSON：<a href="bundle-size.json">bundle-size.json</a>。`,
+    bundleFramework: '框架',
+    bundleRaw: '原始 (KB)',
+    bundleGzip: 'gzip (KB)',
+    resultsHead: '结果',
+    resultsLegend: (th) => `黄色单元格（⚠）表示 <code>iqr/p50 &gt; ${th}</code>——中间 50% 样本的跨度超过中位数的 ${th*100}%，单机 CI 下该数字不够稳定，不能精确对比。悬停单元格可看原始离散度。`,
+    colScenario: '场景',
+    colHead: (id) => `${id} P50 / P95 (ms)`,
+    chartsHead: '各场景 P50',
+    chartCaption: (id) => `${id} — P50`
+  }
+};
 
 const STYLE = `
   body { font: 14px/1.5 system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
@@ -99,7 +146,42 @@ const STYLE = `
   @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
   a { color: #0969da; }
   .legend { color: #666; font-size: 12px; margin: -0.5rem 0 1.5rem; }
+  .lang-switch { float: right; font-size: 12px; }
 `;
+
+function renderPage(lang, summary, bundle) {
+  const t = I18N[lang];
+  const commitLink = summary.commit
+    ? ` · ${esc(t.commit)} <a href="https://github.com/wsafight/fx-arena/commit/${esc(summary.commit)}"><code>${esc(summary.commit.slice(0,7))}</code></a>`
+    : '';
+  const runnerTag = summary.runner ? ` · ${esc(t.runner)} ${esc(summary.runner)}` : '';
+  const bundleSection = bundle
+    ? `<h2>${esc(t.bundleHead)}</h2><p class="legend">${t.bundleLegend}</p>${renderBundleTable(bundle, t)}<p class="legend">${t.bundleNote}</p>`
+    : '';
+  const langSwitch = `<a class="lang-switch" href="${t.other.href}">${esc(t.other.label)}</a>`;
+
+  return `<!doctype html>
+<html lang="${lang}"><head>
+<meta charset="utf-8"/>
+<title>${esc(t.title)}</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>${STYLE}</style>
+</head><body>
+${langSwitch}
+<h1>${esc(t.title)}</h1>
+<div class="meta">
+  ${esc(t.generated)} ${esc(summary.generatedAt)}${commitLink}${runnerTag}
+  · <a href="summary.json">${esc(t.downloadRaw)}</a>
+</div>
+<p>${t.intro(SAMPLES)}</p>
+${bundleSection}
+<h2>${esc(t.resultsHead)}</h2>
+<p class="legend">${t.resultsLegend(NOISE_THRESHOLD)}</p>
+${renderTable(summary, t)}
+<h2>${esc(t.chartsHead)}</h2>
+<div class="grid">${renderCharts(summary, t)}</div>
+</body></html>`;
+}
 
 async function main() {
   const summary = await loadJson(SUMMARY);
@@ -110,36 +192,9 @@ async function main() {
   await copyFile(SUMMARY, join(SITE, 'summary.json'));
   if (bundle) await copyFile(BUNDLE, join(SITE, 'bundle-size.json'));
 
-  const commitLink = summary.commit
-    ? ` · commit <a href="https://github.com/wsafight/fx-arena/commit/${esc(summary.commit)}"><code>${esc(summary.commit.slice(0,7))}</code></a>`
-    : '';
-  const runnerTag = summary.runner ? ` · runner ${esc(summary.runner)}` : '';
-  const bundleSection = bundle
-    ? `<h2>Bundle size</h2><p class="legend">raw + gzip of every <code>.js</code>/<code>.css</code> under <code>dist/</code>. A framework's production cost on first load.</p>${renderBundleTable(bundle)}<p class="legend">raw JSON: <a href="bundle-size.json">bundle-size.json</a></p>`
-    : '';
-
-  const html = `<!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8"/>
-<title>fx-arena — simple-bench</title>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<style>${STYLE}</style>
-</head><body>
-<h1>fx-arena — simple-bench</h1>
-<div class="meta">
-  generated ${esc(summary.generatedAt)}${commitLink}${runnerTag}
-  · <a href="summary.json">download raw JSON</a>
-</div>
-<p>List-bench only (phase 1). Lower is better. P50 / P95 over ${SAMPLES} samples with 10% trim; first ${summary.simple && Object.values(summary.simple)[0] && Object.values(Object.values(summary.simple)[0])[0]?.n ? 'runs discarded as warm-up' : 'few runs discarded'}. See <a href="https://github.com/wsafight/fx-arena">wsafight/fx-arena</a> for the source and the full design doc.</p>
-${bundleSection}
-<h2>Results</h2>
-<p class="legend">Yellow cells (⚠) have <code>iqr/p50 &gt; ${NOISE_THRESHOLD}</code> — the middle 50% of samples spans more than ${NOISE_THRESHOLD*100}% of the median, so the number is too noisy to compare precisely on a single-runner CI. Hover a cell for the raw spread.</p>
-${renderTable(summary)}
-<h2>P50 per scenario</h2>
-<div class="grid">${renderCharts(summary)}</div>
-</body></html>`;
-  await writeFile(join(SITE, 'index.html'), html);
-  console.log('wrote', join(SITE, 'index.html'));
+  await writeFile(join(SITE, 'index.html'), renderPage('en', summary, bundle));
+  await writeFile(join(SITE, 'zh.html'),    renderPage('zh', summary, bundle));
+  console.log('wrote', join(SITE, 'index.html'), '+', join(SITE, 'zh.html'));
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });
