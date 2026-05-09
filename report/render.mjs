@@ -28,7 +28,7 @@ function noisy(s) {
 function renderBundleTable(bundle, t) {
   if (!bundle?.simple) return '';
   const ids = FRAMEWORKS.map(f => f.id).filter(id => bundle.simple[id]);
-  ids.sort((a, b) => bundle.simple[b].raw - bundle.simple[a].raw);
+  ids.sort((a, b) => bundle.simple[a].raw - bundle.simple[b].raw);
   let out = `<table class="bench"><thead><tr><th>${esc(t.bundleFramework)}</th><th>${esc(t.bundleRaw)}</th><th>${esc(t.bundleGzip)}</th><th>${esc(t.bundleBr)}</th></tr></thead><tbody>`;
   for (const id of ids) {
     const b = bundle.simple[id];
@@ -39,6 +39,14 @@ function renderBundleTable(bundle, t) {
 
 function renderTable(summary, t) {
   const ids = FRAMEWORKS.map(f => f.id).filter(id => summary.simple?.[id]);
+  ids.sort((a, b) => {
+    const score = (id) => SCENARIOS.reduce((sum, sc) => {
+      const vals = ids.map(i => summary.simple[i][sc.id]?.p50 ?? Infinity);
+      const sorted = [...vals].sort((x, y) => x - y);
+      return sum + sorted.indexOf(summary.simple[id][sc.id]?.p50 ?? Infinity) + 1;
+    }, 0);
+    return score(a) - score(b);
+  });
   let out = `<table class="bench"><thead><tr><th>${esc(t.colScenario)}</th>`;
   for (const id of ids) out += `<th>${esc(t.colHead(id))}</th>`;
   out += '</tr></thead><tbody>';
@@ -57,25 +65,43 @@ function renderTable(summary, t) {
 
 function renderCharts(summary, t) {
   const ids = FRAMEWORKS.map(f => f.id).filter(id => summary.simple?.[id]);
-  const W = 640, BAR_H = 22, PAD_L = 140, PAD_R = 60, PAD_T = 10, PAD_B = 20;
-  return SCENARIOS.map(sc => {
-    const bars = ids.map(id => ({ id, v: summary.simple[id][sc.id]?.p50 ?? 0 }));
-    const max = Math.max(1, ...bars.map(b => b.v));
-    const H = PAD_T + PAD_B + BAR_H * bars.length;
-    const innerW = W - PAD_L - PAD_R;
-    const rows = bars.map((b, i) => {
-      const y = PAD_T + i * BAR_H + 2;
-      const w = (b.v / max) * innerW;
-      const c = pickColor(b.id);
-      return `
-        <text x="${PAD_L - 8}" y="${y + BAR_H/2 + 4}" text-anchor="end" font-size="12">${esc(b.id)}</text>
-        <rect x="${PAD_L}" y="${y}" width="${w.toFixed(1)}" height="${BAR_H - 6}" fill="${c}" rx="2"/>
-        <text x="${PAD_L + w + 6}" y="${y + BAR_H/2 + 4}" font-size="12">${fmt(b.v)} ms</text>`;
-    }).join('');
-    return `<figure><figcaption>${esc(t.chartCaption(sc.id))}</figcaption>
-      <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="${esc(sc.id)} P50 bars">${rows}</svg>
-    </figure>`;
-  }).join('');
+  const colors = ids.map(id => pickColor(id));
+  const chartData = SCENARIOS.map(sc => ({
+    id: sc.id,
+    caption: t.chartCaption(sc.id),
+    values: ids.map(id => ({ framework: id, value: +(summary.simple[id][sc.id]?.p50 ?? 0).toFixed(2) }))
+  }));
+
+  const containers = chartData.map(d =>
+    `<div id="chart-${d.id}" style="height:280px;"></div>`
+  ).join('');
+
+  const script = `
+<script src="https://unpkg.com/@visactor/vchart@2.0.22/build/index.min.js"><\/script>
+<script>
+(function(){
+  var chartData = ${JSON.stringify(chartData)};
+  var colors = ${JSON.stringify(colors)};
+  chartData.forEach(function(d) {
+    new VChart.VChart({
+      type: 'bar',
+      data: [{ values: d.values }],
+      xField: 'framework',
+      yField: 'value',
+      seriesField: 'framework',
+      color: colors,
+      title: { visible: true, text: d.caption },
+      label: { visible: true, position: 'top' },
+      axes: [
+        { orient: 'bottom', label: { visible: true } },
+        { orient: 'left', title: { visible: true, text: 'ms' } }
+      ]
+    }, { dom: 'chart-' + d.id }).renderSync();
+  });
+})();
+<\/script>`;
+
+  return containers + script;
 }
 
 async function exists(p) { try { await stat(p); return true; } catch { return false; } }
@@ -134,13 +160,18 @@ const I18N = {
 };
 
 const STYLE = `
-  body { font: 14px/1.5 system-ui, sans-serif; max-width: 960px; margin: 2rem auto; padding: 0 1rem; color: #1a1a1a; }
+  body { font: 14px/1.6 system-ui, -apple-system, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1a1a; }
   h1 { margin-bottom: 0.25rem; }
-  h2 { margin-top: 2rem; }
+  h2 { margin-top: 2.5rem; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.5rem; }
   .meta { color: #666; font-size: 12px; margin-bottom: 2rem; }
-  table.bench { border-collapse: collapse; width: 100%; margin-bottom: 1rem; font-variant-numeric: tabular-nums; }
-  table.bench th, table.bench td { border: 1px solid #e0e0e0; padding: 6px 10px; text-align: right; }
-  table.bench th:first-child, table.bench td:first-child { text-align: left; }
+  table.bench { border-collapse: collapse; width: 100%; margin-bottom: 1rem; font-variant-numeric: tabular-nums; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  table.bench th, table.bench td { border: 1px solid #e8ecf0; padding: 10px 14px; text-align: right; }
+  table.bench th:first-child, table.bench td:first-child { text-align: left; font-weight: 500; }
+  table.bench th { background: #f6f8fa; white-space: nowrap; position: sticky; top: 0; }
+  table.bench tbody tr { transition: background 0.1s; }
+  table.bench tbody tr:hover { background: #f0f6ff; }
+  table.bench tbody tr:nth-child(even) { background: #fafbfc; }
+  table.bench tbody tr:nth-child(even):hover { background: #f0f6ff; }
   td.noisy { background: #fff8c5; }
   td.noisy::after { content: ' ⚠'; color: #9a6700; }
   figure { margin: 0 0 1rem; padding: 0; }

@@ -7,3 +7,5 @@ metrics/raw
 metrics/summary.json
 .DS_Store
 *.log
+
+.claude
