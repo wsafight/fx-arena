@@ -5,10 +5,17 @@ export const FRAMEWORKS = [
   { id: 'ripple', app: 'ripple-list', port: 5176 }
 ];
 
-// Each scenario runs inside the page. It sets up state synchronously,
-// then measures the tracked operation. performance.now() is captured
-// before and after a flushSync-style trigger, then awaits one rAF
-// so layout/paint work lands in the delta for like-for-like comparison.
+// Timing model:
+//  - setup() runs synchronously; we force a layout flush so the next
+//    measurement starts from a settled DOM.
+//  - t0 = performance.now(); run() triggers the operation (each app's
+//    hook uses its framework's flushSync-equivalent); then a synchronous
+//    getBoundingClientRect() forces style+layout into the t1 - t0 window.
+//  - Paint is intentionally NOT awaited via rAF: rAF's ~16.7ms frame tick
+//    quantises sub-frame operations (select, swap, remove) into useless
+//    clusters. We measure JS update + style/layout, which is the honest
+//    framework cost. Paint is downstream of the renderer and roughly
+//    equal across frameworks for the same DOM shape.
 export const SCENARIOS = [
   { id: 'create-1k',        setup: (b) => b.clear(),            run: (b) => b.run(1000) },
   { id: 'create-10k',       setup: (b) => b.clear(),            run: (b) => b.run(10000) },
@@ -20,5 +27,5 @@ export const SCENARIOS = [
   { id: 'clear-10k',        setup: (b) => b.run(10000),         run: (b) => b.clear() }
 ];
 
-export const SAMPLES = 10;
-export const WARMUP = 1;
+export const SAMPLES = 20;
+export const WARMUP = 3;

@@ -3,7 +3,18 @@ name: bench
 on:
   push:
     branches: [main]
-  pull_request:
+    paths:
+      - 'bench/**'
+      - 'report/**'
+      - 'metrics/**'
+      - 'simple-bench/**'
+      - 'apps/**'
+      - 'packages/**'
+      - 'package.json'
+      - 'bun.lock'
+      - '.github/workflows/bench.yml'
+  schedule:
+    - cron: '0 6 * * 1'
   workflow_dispatch:
 
 permissions:
@@ -28,8 +39,24 @@ jobs:
       - name: install deps
         run: bun install
 
+      - name: resolve playwright version
+        id: pw
+        run: echo "version=$(bun pm ls 2>/dev/null | grep -oE 'playwright@[0-9.]+' | head -1 | cut -d@ -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: cache playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
       - name: install chromium
         run: bunx playwright install --with-deps chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+
+      - name: install chromium system deps only
+        run: bunx playwright install-deps chromium
+        if: steps.pw-cache.outputs.cache-hit == 'true'
 
       - name: build simple-bench
         run: bun run build:simple

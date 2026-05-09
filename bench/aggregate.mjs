@@ -15,12 +15,18 @@ function quantile(arr, q) {
 
 function stats(samples) {
   if (!samples?.length) return null;
-  const p50 = quantile(samples, 0.5);
-  const p95 = quantile(samples, 0.95);
-  const iqr = quantile(samples, 0.75) - quantile(samples, 0.25);
-  const min = Math.min(...samples);
-  const max = Math.max(...samples);
-  return { n: samples.length, p50, p95, iqr, min, max };
+  // Trim 10% from each tail when we have enough samples — removes the
+  // single worst JIT hit and any one-off GC pause from distorting P50/P95.
+  const sorted = samples.slice().sort((a, b) => a - b);
+  const trim = sorted.length >= 10 ? Math.floor(sorted.length * 0.1) : 0;
+  const trimmed = trim ? sorted.slice(trim, sorted.length - trim) : sorted;
+
+  const p50 = quantile(trimmed, 0.5);
+  const p95 = quantile(trimmed, 0.95);
+  const iqr = quantile(trimmed, 0.75) - quantile(trimmed, 0.25);
+  const min = trimmed[0];
+  const max = trimmed[trimmed.length - 1];
+  return { n: samples.length, nAfterTrim: trimmed.length, p50, p95, iqr, min, max };
 }
 
 async function main() {

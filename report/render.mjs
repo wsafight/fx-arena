@@ -89,11 +89,11 @@ async function main() {
 <h1>fx-arena — simple-bench</h1>
 <div class="meta">
   generated ${esc(summary.generatedAt)}
-  ${summary.commit ? ' · commit <code>' + esc(summary.commit.slice(0,7)) + '</code>' : ''}
+  ${summary.commit ? ' · commit <a href="https://github.com/wsafight/fx-arena/commit/' + esc(summary.commit) + '"><code>' + esc(summary.commit.slice(0,7)) + '</code></a>' : ''}
   ${summary.runner ? ' · runner ' + esc(summary.runner) : ''}
   · <a href="summary.json">download raw JSON</a>
 </div>
-<p>List-bench only (phase 1). Lower is better. P50 / P95 over 10 samples, first run discarded. See <a href="https://github.com/">repo</a> for the source and the full design doc.</p>
+<p>List-bench only (phase 1). Lower is better. P50 / P95 over 10 samples, first run discarded. See <a href="https://github.com/wsafight/fx-arena">wsafight/fx-arena</a> for the source and the full design doc.</p>
 <h2>Results</h2>
 ${renderTable(summary)}
 <h2>P50 per scenario</h2>

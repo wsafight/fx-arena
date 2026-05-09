@@ -16,12 +16,17 @@ async function runOne(page, setupFn, runFn) {
     if (!b || !b.ready) throw new Error('__simpleBench not ready');
     // eslint-disable-next-line no-new-func
     (new Function('b', `return (${setupSrc})(b)`))(b);
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    // Settle the DOM from setup work so it doesn't leak into the measurement.
+    document.body.getBoundingClientRect();
     if (window.gc) window.gc();
     const t0 = performance.now();
     // eslint-disable-next-line no-new-func
     (new Function('b', `return (${runSrc})(b)`))(b);
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+    // Force style + layout into the measurement window. No rAF — that
+    // would quantise sub-frame operations to ~16.7 ms frame boundaries
+    // and flatten real differences. Paint happens after t1 and is
+    // approximately equal across frameworks for the same DOM shape.
+    document.body.getBoundingClientRect();
     const t1 = performance.now();
     window.__lastSample = t1 - t0;
   }, { setupSrc: setupFn.toString(), runSrc: runFn.toString() });
