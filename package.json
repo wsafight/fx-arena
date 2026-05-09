@@ -12,8 +12,9 @@
     "build:simple": "bun --filter='*' run build",
     "bench:simple": "bun bench/runner.mjs --suite simple",
     "bench": "bun run bench:simple && bun bench/aggregate.mjs",
+    "metrics:bundle": "bun metrics/bundle-size.mjs",
     "report:render": "bun report/render.mjs",
-    "clean": "rm -rf simple-bench/*/dist metrics/raw metrics/summary.json site"
+    "clean": "rm -rf simple-bench/*/dist metrics/raw metrics/summary.json metrics/bundle-size.json site"
   },
   "devDependencies": {
     "playwright": "1.49.1",

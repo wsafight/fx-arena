@@ -4,15 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview --port 5176 --strictPort"
+    "build": "vite build"
   },
   "dependencies": {
     "ripple": "0.3.52"
   },
   "devDependencies": {
     "@ripple-ts/vite-plugin": "0.3.52",
-    "vite": "6.0.7"
+    "vite": "8.0.11"
   }
 }

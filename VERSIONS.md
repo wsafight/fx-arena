@@ -5,11 +5,11 @@ Phase 1 scope: simple-bench only.
 | target | version | notes |
 |--------|---------|-------|
 | bun | 1.3.13 | workspace root |
-| vite | 6.0.7 | three JS-based apps |
-| react / react-dom | 19.0.0 | — |
-| svelte | 5.16.0 | runes; `@sveltejs/vite-plugin-svelte` 5.0.3 |
-| imba | 2.0.0-alpha.229 | own CLI; `imba build --outdir=dist` + html shim |
-| ripple | 0.3.52 | `@ripple-ts/vite-plugin` 0.3.52 |
+| vite | 8.0.11 | three JS-based apps |
+| react / react-dom | 19.2.6 | `@vitejs/plugin-react` 6.0.1 |
+| svelte | 5.55.5 | runes; `@sveltejs/vite-plugin-svelte` 7.1.2 |
+| imba | 2.0.0-alpha.247 | own CLI; `imba build --outdir=dist` + html shim |
+| ripple | 0.3.52 | `@ripple-ts/vite-plugin` 0.3.52 (works on vite 8) |
 
 ## Ripple 0.3.x integration notes (2026-05-10)
 

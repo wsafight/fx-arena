@@ -4,15 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "imba --port 5175 src/main.imba",
     "build": "imba build --outdir=dist --web src/main.imba && bun run build:html",
-    "build:html": "bun build-html.mjs",
-    "preview": "bunx serve -s dist -l 5175"
+    "build:html": "bun build-html.mjs"
   },
   "dependencies": {
-    "imba": "2.0.0-alpha.229"
-  },
-  "devDependencies": {
-    "serve": "14.2.4"
+    "imba": "2.0.0-alpha.247"
   }
 }

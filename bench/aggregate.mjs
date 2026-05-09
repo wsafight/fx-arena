@@ -26,7 +26,11 @@ function stats(samples) {
   const iqr = quantile(trimmed, 0.75) - quantile(trimmed, 0.25);
   const min = trimmed[0];
   const max = trimmed[trimmed.length - 1];
-  return { n: samples.length, nAfterTrim: trimmed.length, p50, p95, iqr, min, max };
+  // iqr/p50 is a dimensionless noise ratio: >0.2 means the middle 50%
+  // spans more than a fifth of the median, i.e. the single-runner CI is
+  // too noisy to trust for that cell. Rendered with a yellow flag.
+  const iqrRatio = p50 > 0 ? iqr / p50 : 0;
+  return { n: samples.length, nAfterTrim: trimmed.length, p50, p95, iqr, iqrRatio, min, max };
 }
 
 async function main() {

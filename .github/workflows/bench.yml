@@ -65,6 +65,9 @@ jobs:
       - name: run bench
         run: bun run bench
 
+      - name: measure bundles
+        run: bun run metrics:bundle
+
       - name: render report
         run: bun run report:render
 

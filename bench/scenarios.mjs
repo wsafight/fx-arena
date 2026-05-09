@@ -17,6 +17,7 @@ export const FRAMEWORKS = [
 //    framework cost. Paint is downstream of the renderer and roughly
 //    equal across frameworks for the same DOM shape.
 export const SCENARIOS = [
+  { id: 'create-100',       setup: (b) => b.clear(),            run: (b) => b.run(100) },
   { id: 'create-1k',        setup: (b) => b.clear(),            run: (b) => b.run(1000) },
   { id: 'create-10k',       setup: (b) => b.clear(),            run: (b) => b.run(10000) },
   { id: 'append-1k',        setup: (b) => b.run(1000),          run: (b) => b.append(1000) },
@@ -24,6 +25,7 @@ export const SCENARIOS = [
   { id: 'select-row',       setup: (b) => b.run(1000),          run: (b) => b.select(500) },
   { id: 'swap-rows',        setup: (b) => b.run(1000),          run: (b) => b.swap() },
   { id: 'remove-row',       setup: (b) => b.run(1000),          run: (b) => b.remove(500) },
+  { id: 'clear-1k',         setup: (b) => b.run(1000),          run: (b) => b.clear() },
   { id: 'clear-10k',        setup: (b) => b.run(10000),         run: (b) => b.clear() }
 ];
 
