@@ -1,12 +1,12 @@
 <script setup>
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, onMounted } from 'vue';
 import { buildRows, resetIds } from '../../shared/data.js';
 
 const rows = ref([]);
 const selectedId = ref(-1);
 
 window.__simpleBench = {
-  ready: true,
+  ready: false,
   async run(n) { resetIds(); selectedId.value = -1; rows.value = buildRows(n); await nextTick(); },
   async append(n) { rows.value = rows.value.concat(buildRows(n)); await nextTick(); },
   async updateEvery10th() {
@@ -27,6 +27,8 @@ window.__simpleBench = {
   async clear() { rows.value = []; selectedId.value = -1; await nextTick(); },
   count() { return rows.value.length; }
 };
+
+onMounted(() => { window.__simpleBench.ready = true; });
 </script>
 
 <template>
