@@ -37,7 +37,7 @@ function renderBundleTable(bundle, t) {
   return out + '</tbody></table>';
 }
 
-function renderTable(summary, t) {
+function rankIds(summary) {
   const ids = FRAMEWORKS.map(f => f.id).filter(id => summary.simple?.[id]);
   const n = ids.length;
   const getScore = (id) => SCENARIOS.reduce((sum, sc) => {
@@ -46,6 +46,11 @@ function renderTable(summary, t) {
     return sum + n - sorted.indexOf(summary.simple[id][sc.id]?.p50 ?? Infinity);
   }, 0);
   ids.sort((a, b) => getScore(b) - getScore(a));
+  return { ids, getScore };
+}
+
+function renderTable(summary, t) {
+  const { ids, getScore } = rankIds(summary);
   let out = `<table class="bench"><thead><tr><th>${esc(t.colScenario)}</th>`;
   for (const id of ids) out += `<th>${esc(t.colHead(id))}</th>`;
   out += '</tr></thead><tbody>';
@@ -68,7 +73,7 @@ function renderTable(summary, t) {
 }
 
 function renderCharts(summary, t) {
-  const ids = FRAMEWORKS.map(f => f.id).filter(id => summary.simple?.[id]);
+  const { ids } = rankIds(summary);
   const colors = ids.map(id => pickColor(id));
   const chartData = SCENARIOS.map(sc => ({
     id: sc.id,
