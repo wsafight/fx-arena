@@ -1,4 +1,4 @@
-<script setup>
+<script setup vapor>
 import { ref, nextTick, onMounted } from 'vue';
 import { buildRows, resetIds } from '../../shared/data.js';
 
