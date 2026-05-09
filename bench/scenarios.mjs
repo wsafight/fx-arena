@@ -1,8 +1,10 @@
 export const FRAMEWORKS = [
-  { id: 'react',  app: 'react-list',  port: 5173 },
-  { id: 'svelte', app: 'svelte-list', port: 5174 },
-  { id: 'imba',   app: 'imba-list',   port: 5175 },
-  { id: 'ripple', app: 'ripple-list', port: 5176 }
+  { id: 'react',     app: 'react-list',      port: 5173 },
+  { id: 'svelte',    app: 'svelte-list',     port: 5174 },
+  { id: 'imba',      app: 'imba-list',       port: 5175 },
+  { id: 'ripple',    app: 'ripple-list',     port: 5176 },
+  { id: 'vue',       app: 'vue-list',        port: 5177 },
+  { id: 'vue-vapor', app: 'vue-vapor-list',  port: 5178 }
 ];
 
 // Timing model:

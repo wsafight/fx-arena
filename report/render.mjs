@@ -18,7 +18,7 @@ function fmt(n) { return n == null ? '—' : n.toFixed(1); }
 function fmtKB(n) { return n == null ? '—' : (n / 1024).toFixed(1); }
 
 function pickColor(id) {
-  return { react:'#61dafb', svelte:'#ff3e00', imba:'#6610f2', ripple:'#10b981' }[id] || '#888';
+  return { react:'#61dafb', svelte:'#ff3e00', imba:'#6610f2', ripple:'#10b981', vue:'#42b883', 'vue-vapor':'#35495e' }[id] || '#888';
 }
 
 function noisy(s) {
