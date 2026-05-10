@@ -15,20 +15,15 @@ function quantile(arr, q) {
 
 function stats(samples) {
   if (!samples?.length) return null;
-  // Trim 10% from each tail when we have enough samples — removes the
-  // single worst JIT hit and any one-off GC pause from distorting P50/P95.
   const sorted = samples.slice().sort((a, b) => a - b);
   const trim = sorted.length >= 10 ? Math.floor(sorted.length * 0.1) : 0;
   const trimmed = trim ? sorted.slice(trim, sorted.length - trim) : sorted;
 
   const p50 = quantile(trimmed, 0.5);
-  const p95 = quantile(trimmed, 0.95);
+  const p95 = quantile(sorted, 0.95);
   const iqr = quantile(trimmed, 0.75) - quantile(trimmed, 0.25);
   const min = trimmed[0];
   const max = trimmed[trimmed.length - 1];
-  // iqr/p50 is a dimensionless noise ratio: >0.2 means the middle 50%
-  // spans more than a fifth of the median, i.e. the single-runner CI is
-  // too noisy to trust for that cell. Rendered with a yellow flag.
   const iqrRatio = p50 > 0 ? iqr / p50 : 0;
   return { n: samples.length, nAfterTrim: trimmed.length, p50, p95, iqr, iqrRatio, min, max };
 }
@@ -62,7 +57,13 @@ async function main() {
   const frameworks = {};
   const memory = {};
   for (const f of files) {
-    const data = JSON.parse(await readFile(join(RAW_DIR, f), 'utf8'));
+    let data;
+    try {
+      data = JSON.parse(await readFile(join(RAW_DIR, f), 'utf8'));
+    } catch (e) {
+      console.warn(`skipping ${f}: ${e.message}`);
+      continue;
+    }
     const agg = {};
     for (const [sid, samples] of Object.entries(data.scenarios)) agg[sid] = stats(samples);
     frameworks[data.framework] = agg;

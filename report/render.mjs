@@ -31,42 +31,51 @@ function renderBundleTable(bundle, t) {
   if (!bundle?.simple) return '';
   const ids = FRAMEWORKS.map(f => f.id).filter(id => bundle.simple[id]);
   ids.sort((a, b) => bundle.simple[a].raw - bundle.simple[b].raw);
+  const minGz = Math.min(...ids.map(id => bundle.simple[id].gz));
+  const maxGz = Math.max(...ids.map(id => bundle.simple[id].gz));
   let out = `<table class="bench"><thead><tr><th>${esc(t.bundleFramework)}</th><th>${esc(t.bundleRaw)}</th><th>${esc(t.bundleGzip)}</th><th>${esc(t.bundleBr)}</th></tr></thead><tbody>`;
   for (const id of ids) {
     const b = bundle.simple[id];
-    out += `<tr><td>${esc(id)}</td><td>${fmtKB(b.raw)}</td><td>${fmtKB(b.gz)}</td><td>${fmtKB(b.br)}</td></tr>`;
+    const gzCls = b.gz === minGz ? ' class="best"' : b.gz === maxGz ? ' class="worst"' : '';
+    out += `<tr><td><span class="dot" style="background:${pickColor(id)}"></span>${esc(id)}</td><td>${fmtKB(b.raw)}</td><td${gzCls}>${fmtKB(b.gz)}</td><td>${fmtKB(b.br)}</td></tr>`;
   }
   return out + '</tbody></table>';
 }
 
 function renderMemoryTable(summary, t) {
   if (!summary.memory || !Object.keys(summary.memory).length) return '';
-  const { ids } = rankIds(summary);
-  const memoryIds = ids.filter(id => summary.memory[id]);
+  const memoryIds = FRAMEWORKS.map(f => f.id).filter(id => summary.memory[id]);
   const n = memoryIds.length;
   const getMemoryScore = (id) => MEMORY_SCENARIOS.reduce((sum, sc) => {
     const vals = memoryIds.map(i => summary.memory[i]?.[sc.id]?.usedJSHeapSize?.p50 ?? Infinity);
     const sorted = [...vals].sort((x, y) => x - y);
     return sum + n - sorted.indexOf(summary.memory[id]?.[sc.id]?.usedJSHeapSize?.p50 ?? Infinity);
   }, 0);
+  memoryIds.sort((a, b) => getMemoryScore(b) - getMemoryScore(a));
 
   let out = `<table class="bench"><thead><tr><th>${esc(t.memoryScenario)}</th>`;
-  for (const id of memoryIds) out += `<th>${esc(t.memoryCol(id))}</th>`;
+  for (const id of memoryIds) out += `<th><span class="dot" style="background:${pickColor(id)}"></span>${esc(t.memoryCol(id))}</th>`;
   out += '</tr></thead><tbody>';
   for (const sc of MEMORY_SCENARIOS) {
+    const heapVals = memoryIds.map(id => summary.memory[id]?.[sc.id]?.usedJSHeapSize?.p50 ?? Infinity);
+    const minHeap = Math.min(...heapVals);
+    const maxHeap = Math.max(...heapVals.filter(v => v !== Infinity));
     out += `<tr><td>${esc(sc.id)}</td>`;
-    for (const id of memoryIds) {
+    for (let i = 0; i < memoryIds.length; i++) {
+      const id = memoryIds[i];
       const s = summary.memory[id]?.[sc.id];
       const heap = fmtMB(s?.usedJSHeapSize?.p50);
       const nodes = fmtInt(s?.nodes?.p50);
       const listeners = fmtInt(s?.jsEventListeners?.p50);
       const title = s ? `n=${s.n}, heap=${heap}MB, nodes=${nodes}, listeners=${listeners}` : '';
-      out += `<td title="${esc(title)}">${heap} / ${nodes}</td>`;
+      const hv = s?.usedJSHeapSize?.p50 ?? Infinity;
+      const cls = hv <= minHeap ? ' class="best"' : hv >= maxHeap ? ' class="worst"' : '';
+      out += `<td${cls} title="${esc(title)}">${heap} / ${nodes}</td>`;
     }
     out += '</tr>';
   }
   out += `<tr class="score-row"><td>${esc(t.memoryScoreLabel)} <span class="score-help" data-tip="${esc(t.memoryScoreTooltip)}">?</span></td>`;
-  for (const id of memoryIds) out += `<td><strong>${getMemoryScore(id)}</strong></td>`;
+  for (const id of memoryIds) out += `<td><span class="score-badge">${getMemoryScore(id)}</span></td>`;
   out += '</tr>';
   return out + '</tbody></table>';
 }
@@ -86,65 +95,33 @@ function rankIds(summary) {
 function renderTable(summary, t) {
   const { ids, getScore } = rankIds(summary);
   let out = `<table class="bench"><thead><tr><th>${esc(t.colScenario)}</th>`;
-  for (const id of ids) out += `<th>${esc(t.colHead(id))}</th>`;
+  for (const id of ids) out += `<th><span class="dot" style="background:${pickColor(id)}"></span>${esc(t.colHead(id))}</th>`;
   out += '</tr></thead><tbody>';
   for (const sc of SCENARIOS) {
+    const p50s = ids.map(id => summary.simple[id][sc.id]?.p50 ?? Infinity);
+    const minP50 = Math.min(...p50s);
+    const maxP50 = Math.max(...p50s.filter(v => v !== Infinity));
     out += `<tr><td>${esc(sc.id)}</td>`;
-    for (const id of ids) {
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i];
       const s = summary.simple[id][sc.id];
       const title = s ? `n=${s.n}, iqr=${fmt(s.iqr)}ms (${((s.iqrRatio||0)*100).toFixed(0)}% of p50)` : '';
-      const cls = noisy(s) ? ' class="noisy"' : '';
-      out += `<td${cls} title="${esc(title)}">${fmt(s?.p50)} / ${fmt(s?.p95)}</td>`;
+      const p50v = s?.p50 ?? Infinity;
+      const classes = [];
+      if (p50v <= minP50) classes.push('best');
+      else if (p50v >= maxP50) classes.push('worst');
+      if (noisy(s) && !classes.includes('best')) classes.push('noisy');
+      const cls = classes.join(' ');
+      out += `<td${cls ? ` class="${cls}"` : ''} title="${esc(title)}">${fmt(s?.p50)} / ${fmt(s?.p95)}</td>`;
     }
     out += '</tr>';
   }
   out += `<tr class="score-row"><td>${esc(t.scoreLabel)} <span class="score-help" data-tip="${esc(t.scoreTooltip)}">?</span></td>`;
   for (const id of ids) {
-    out += `<td><strong>${getScore(id)}</strong></td>`;
+    out += `<td><span class="score-badge">${getScore(id)}</span></td>`;
   }
   out += '</tr>';
   return out + '</tbody></table>';
-}
-
-function renderCharts(summary, t) {
-  const { ids } = rankIds(summary);
-  const colors = ids.map(id => pickColor(id));
-  const chartData = SCENARIOS.map(sc => ({
-    id: sc.id,
-    caption: t.chartCaption(sc.id),
-    values: ids.map(id => ({ framework: id, value: +(summary.simple[id][sc.id]?.p50 ?? 0).toFixed(2) }))
-  }));
-
-  const containers = chartData.map(d =>
-    `<div id="chart-${d.id}" style="height:280px;"></div>`
-  ).join('');
-
-  const script = `
-<script src="https://unpkg.com/@visactor/vchart@2.0.22/build/index.min.js"><\/script>
-<script>
-(function(){
-  var chartData = ${JSON.stringify(chartData)};
-  var colors = ${JSON.stringify(colors)};
-  chartData.forEach(function(d) {
-    new VChart.VChart({
-      type: 'bar',
-      data: [{ values: d.values }],
-      xField: 'framework',
-      yField: 'value',
-      seriesField: 'framework',
-      color: colors,
-      title: { visible: true, text: d.caption },
-      label: { visible: true, position: 'top' },
-      axes: [
-        { orient: 'bottom', label: { visible: true } },
-        { orient: 'left', title: { visible: true, text: 'ms' } }
-      ]
-    }, { dom: 'chart-' + d.id }).renderSync();
-  });
-})();
-<\/script>`;
-
-  return containers + script;
 }
 
 async function exists(p) { try { await stat(p); return true; } catch { return false; } }
@@ -171,19 +148,20 @@ const I18N = {
     bundleGzip: 'gzip (KB)',
     bundleBr: 'br (KB)',
     memoryHead: 'Memory',
-    memoryLegend: (n) => `P50 over ${n} fresh page loads. Columns use the same left-to-right order as the time results below. Each cell is <code>used JS heap MB / DOM nodes</code> after forced GC; hover for listener counts.`,
+    memoryLegend: (n) => `P50 over ${n} fresh page loads. Columns are sorted by memory score, high to low. Each cell is <code>used JS heap MB / DOM nodes</code> after forced GC; hover for listener counts.`,
     memoryScenario: 'scenario',
     memoryCol: (id) => `${id} heap / nodes`,
-    memoryScoreLabel: 'memory score',
+    memoryScoreLabel: 'score',
     memoryScoreTooltip: 'Per memory scenario: lowest used JS heap gets N points (N = number of frameworks), highest gets 1. Higher total = lower heap overall.',
-    resultsHead: 'Results',
-    resultsLegend: (th) => `Yellow cells (⚠) have <code>iqr/p50 &gt; ${th}</code> — the middle 50% of samples spans more than ${th*100}% of the median, so the number is too noisy to compare precisely on a single local runner. Hover a cell for the raw spread.`,
+    resultsHead: 'Timing (P50 / P95, ms)',
+    resultsLegend: (th) => `Yellow cells have <code>iqr/p50 &gt; ${th}</code> — the middle 50% of samples spans more than ${th*100}% of the median, so the number is too noisy to compare precisely on a single local runner. Hover a cell for the raw spread.`,
     colScenario: 'scenario',
-    colHead: (id) => `${id} P50 / P95 (ms)`,
+    colHead: (id) => id,
     scoreLabel: 'score',
     scoreTooltip: 'Per scenario: fastest gets N points (N = number of frameworks), slowest gets 1. Higher total = better overall.',
     chartsHead: 'P50 per scenario',
-    chartCaption: (id) => `${id} — P50`
+    summaryHead: 'Summary',
+    summaryLegend: 'Composite score = timing rank + memory rank + bundle gzip rank. Higher is better.'
   },
   zh: {
     title: 'fx-arena — 简单性能基准',
@@ -202,48 +180,120 @@ const I18N = {
     bundleGzip: 'gzip (KB)',
     bundleBr: 'br (KB)',
     memoryHead: '内存',
-    memoryLegend: (n) => `每项 ${n} 次全新页面加载后取 P50。列顺序与下方耗时结果一致。单元格格式为 <code>used JS heap MB / DOM nodes</code>，采样前强制 GC；悬停可看事件监听器数量。`,
+    memoryLegend: (n) => `每项 ${n} 次全新页面加载后取 P50。列顺序按内存得分从高到低排列。单元格格式为 <code>used JS heap MB / DOM nodes</code>，采样前强制 GC；悬停可看事件监听器数量。`,
     memoryScenario: '场景',
     memoryCol: (id) => `${id} heap / nodes`,
-    memoryScoreLabel: '内存得分',
+    memoryScoreLabel: '得分',
     memoryScoreTooltip: '每个内存场景：used JS heap 最低得 N 分（N = 框架数），最高得 1 分。总分越高，整体 heap 越低。',
-    resultsHead: '结果',
-    resultsLegend: (th) => `黄色单元格（⚠）表示 <code>iqr/p50 &gt; ${th}</code>——中间 50% 样本的跨度超过中位数的 ${th*100}%，单机本地 runner 下该数字不够稳定，不能精确对比。悬停单元格可看原始离散度。`,
+    resultsHead: '耗时 (P50 / P95, ms)',
+    resultsLegend: (th) => `黄色单元格表示 <code>iqr/p50 &gt; ${th}</code>——中间 50% 样本的跨度超过中位数的 ${th*100}%，单机本地 runner 下该数字不够稳定，不能精确对比。悬停单元格可看原始离散度。`,
     colScenario: '场景',
-    colHead: (id) => `${id} P50 / P95 (ms)`,
+    colHead: (id) => id,
     scoreLabel: '得分',
     scoreTooltip: '每个场景：最快得 N 分（N = 框架数），最慢得 1 分。总分越高，综合表现越好。',
     chartsHead: '各场景 P50',
-    chartCaption: (id) => `${id} — P50`
+    summaryHead: '综合评价',
+    summaryLegend: '综合得分 = 耗时排名分 + 内存排名分 + 打包 gzip 排名分。分数越高越好。'
   }
 };
 
 const STYLE = `
-  body { font: 14px/1.6 system-ui, -apple-system, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1a1a; }
-  h1 { margin-bottom: 0.25rem; }
-  h2 { margin-top: 2.5rem; border-bottom: 1px solid #e0e0e0; padding-bottom: 0.5rem; }
-  .meta { color: #666; font-size: 12px; margin-bottom: 2rem; }
-  table.bench { border-collapse: collapse; width: 100%; margin-bottom: 1rem; font-variant-numeric: tabular-nums; border-radius: 6px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
-  table.bench th, table.bench td { border: 1px solid #e8ecf0; padding: 10px 14px; text-align: right; }
+  :root { --green: #10b981; --red: #ef4444; --blue: #0969da; --border: #e8ecf0; --bg-alt: #f6f8fa; }
+  body { font: 14px/1.6 system-ui, -apple-system, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; color: #1a1a1a; }
+  h1 { font-size: 1.75rem; font-weight: 700; margin-bottom: 0.25rem; letter-spacing: -0.02em; }
+  h2 { margin-top: 2.5rem; padding: 0.4rem 0 0.4rem 0.75rem; border-left: 4px solid var(--green); border-bottom: none; font-size: 1.1rem; font-weight: 600; }
+  .meta { color: #666; font-size: 12px; margin-bottom: 2rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  table.bench { border-collapse: collapse; width: 100%; margin-bottom: 1rem; font-variant-numeric: tabular-nums; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+  table.bench th, table.bench td { border: 1px solid var(--border); padding: 9px 13px; text-align: right; }
   table.bench th:first-child, table.bench td:first-child { text-align: left; font-weight: 500; }
-  table.bench th { background: #f6f8fa; white-space: nowrap; position: sticky; top: 0; }
+  table.bench th { background: var(--bg-alt); white-space: nowrap; position: sticky; top: 0; font-size: 12px; color: #444; }
+  table.bench th .dot, table.bench td .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
   table.bench tbody tr { transition: background 0.1s; }
   table.bench tbody tr:hover { background: #f0f6ff; }
   table.bench tbody tr:nth-child(even) { background: #fafbfc; }
   table.bench tbody tr:nth-child(even):hover { background: #f0f6ff; }
   td.noisy { background: #fff8c5; }
-  td.noisy::after { content: ' ⚠'; color: #9a6700; }
-  .score-row td { border-top: 2px solid #d0d7de; background: #f6f8fa; }
-  .score-help { display: inline-block; width: 18px; height: 18px; line-height: 18px; text-align: center; border-radius: 50%; background: #d0d7de; color: #555; font-size: 12px; cursor: help; vertical-align: middle; position: relative; }
+  td.best { background: #d1fae5 !important; color: #065f46; font-weight: 600; }
+  td.worst { background: #fee2e2 !important; color: #991b1b; }
+  .score-row td { border-top: 2px solid #d0d7de; background: var(--bg-alt); }
+  .score-badge { display: inline-block; background: var(--green); color: #fff; font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 10px; }
+  .score-row td:not(:first-child) { font-size: 13px; }
+  .score-help { display: inline-block; width: 16px; height: 16px; line-height: 16px; text-align: center; border-radius: 50%; background: #d0d7de; color: #555; font-size: 11px; cursor: help; vertical-align: middle; position: relative; }
   .score-help:hover::after { content: attr(data-tip); position: absolute; left: 0; bottom: 150%; background: #24292f; color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px; line-height: 1.5; width: max-content; max-width: 320px; white-space: normal; z-index: 10; pointer-events: none; box-shadow: 0 2px 8px rgba(0,0,0,0.2); }
   figure { margin: 0 0 1rem; padding: 0; }
   figcaption { font-weight: 600; margin-bottom: 0.25rem; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
   @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
-  a { color: #0969da; }
-  .legend { color: #666; font-size: 12px; margin: -0.5rem 0 1.5rem; }
-  .lang-switch { float: right; font-size: 12px; }
+  a { color: var(--blue); }
+  .legend { color: #666; font-size: 12px; margin: 0.25rem 0 1.25rem; }
+  .lang-switch { float: right; font-size: 12px; padding: 3px 10px; border: 1px solid var(--border); border-radius: 4px; text-decoration: none; color: #444; background: var(--bg-alt); }
+  .lang-switch:hover { background: #eef2f7; }
+  .verdicts { list-style: none; padding: 0; margin: 1rem 0; }
+  .verdicts li { padding: 0.5rem 0.75rem; margin-bottom: 0.5rem; border-left: 3px solid var(--border); font-size: 13px; line-height: 1.5; }
+  .verdicts li:nth-child(1) { border-color: #10b981; }
+  .verdicts li:nth-child(2) { border-color: #35495e; }
+  .verdicts li:nth-child(3) { border-color: #6610f2; }
 `;
+
+function renderSummary(summary, bundle, lang) {
+  const { ids, getScore: getTimingScore } = rankIds(summary);
+  const n = ids.length;
+  const memoryIds = ids.filter(id => summary.memory?.[id]);
+
+  const getMemoryScore = (id) => {
+    if (!summary.memory?.[id]) return 0;
+    return MEMORY_SCENARIOS.reduce((sum, sc) => {
+      const vals = memoryIds.map(i => summary.memory[i]?.[sc.id]?.usedJSHeapSize?.p50 ?? Infinity);
+      const sorted = [...vals].sort((x, y) => x - y);
+      return sum + n - sorted.indexOf(summary.memory[id]?.[sc.id]?.usedJSHeapSize?.p50 ?? Infinity);
+    }, 0);
+  };
+
+  const getBundleScore = (id) => {
+    if (!bundle?.simple?.[id]) return 0;
+    const gzVals = ids.filter(i => bundle.simple[i]).map(i => bundle.simple[i].gz);
+    const sorted = [...gzVals].sort((a, b) => a - b);
+    return n - sorted.indexOf(bundle.simple[id].gz);
+  };
+
+  const ranked = ids.map(id => ({
+    id, timing: getTimingScore(id), memory: getMemoryScore(id), bundle: getBundleScore(id),
+    total: getTimingScore(id) + getMemoryScore(id) + getBundleScore(id)
+  })).sort((a, b) => b.total - a.total);
+
+  const th = lang === 'zh'
+    ? ['框架', '耗时分', '内存分', '体积分', '总分']
+    : ['framework', 'timing', 'memory', 'bundle', 'total'];
+
+  let out = `<table class="bench"><thead><tr>${th.map(h => `<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>`;
+  for (const r of ranked) {
+    out += `<tr><td><span class="dot" style="background:${pickColor(r.id)}"></span>${esc(r.id)}</td><td>${r.timing}</td><td>${r.memory}</td><td>${r.bundle}</td><td><strong>${r.total}</strong></td></tr>`;
+  }
+  out += '</tbody></table>';
+
+  const verdicts = lang === 'zh' ? {
+    ripple: 'Ripple 在耗时、内存、体积三项全面领先，是纯性能维度的最优选择。但生态尚不成熟，适合对性能极致追求的场景。',
+    'vue-vapor': 'Vue Vapor 作为 Vue 的下一代编译策略，性能接近 Ripple，同时继承 Vue 生态，是兼顾性能与生产力的首选。',
+    vue: 'Vue 3 表现均衡，各项无明显短板，成熟的生态和工具链使其仍是大多数项目的稳妥选择。',
+    react: 'React 在细粒度更新（update-every-10th）上表现优秀，但 swap-rows 和打包体积是短板。生态最丰富。',
+    svelte: 'Svelte 在小规模操作上快速，但 append-1k-to-10k 等大列表场景下性能下降明显，内存占用偏高。',
+    imba: 'Imba 的 create-10k 极快（得益于编译器直出 DOM），但细粒度更新和 select/swap 操作较慢，适合一次性渲染大量静态内容。'
+  } : {
+    ripple: 'Ripple leads across timing, memory, and bundle size — the best pure-performance choice. Ecosystem is still young.',
+    'vue-vapor': 'Vue Vapor delivers near-Ripple speed while inheriting the full Vue ecosystem. Best balance of performance and productivity.',
+    vue: 'Vue 3 is well-rounded with no major weakness. Mature tooling and ecosystem make it a safe default for most projects.',
+    react: 'React excels at fine-grained updates (update-every-10th) but pays a cost in swap-rows and bundle size. Richest ecosystem.',
+    svelte: 'Svelte is fast for small operations but degrades on large-list scenarios (append-1k-to-10k). Higher memory footprint.',
+    imba: 'Imba\'s compiler-driven DOM output makes create-10k extremely fast, but fine-grained updates and select/swap are slower. Best for bulk static rendering.'
+  };
+
+  out += '<ul class="verdicts">';
+  for (const r of ranked) {
+    out += `<li><strong>${esc(r.id)}</strong> — ${esc(verdicts[r.id] || '')}</li>`;
+  }
+  out += '</ul>';
+  return out;
+}
 
 function renderPage(lang, summary, bundle) {
   const t = I18N[lang];
@@ -278,8 +328,9 @@ ${memorySection}
 <h2>${esc(t.resultsHead)}</h2>
 <p class="legend">${t.resultsLegend(NOISE_THRESHOLD)}</p>
 ${renderTable(summary, t)}
-<h2>${esc(t.chartsHead)}</h2>
-<div class="grid">${renderCharts(summary, t)}</div>
+<h2>${esc(t.summaryHead)}</h2>
+<p class="legend">${esc(t.summaryLegend)}</p>
+${renderSummary(summary, bundle, lang)}
 </body></html>`;
 }
 
