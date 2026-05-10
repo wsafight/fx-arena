@@ -5,6 +5,7 @@ dist
 site
 metrics/raw
 metrics/summary.json
+metrics/bundle-size.json
 .DS_Store
 *.log
 

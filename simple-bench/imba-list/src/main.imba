@@ -23,6 +23,10 @@ global.__simpleBench = {
 		selectedId = -1
 		rows = buildRows(n)
 		await imba.commit!
+	replace: do(n)
+		selectedId = -1
+		rows = buildRows(n)
+		await imba.commit!
 	append: do(n)
 		rows = rows.concat(buildRows(n))
 		await imba.commit!

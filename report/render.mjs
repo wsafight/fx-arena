@@ -1,12 +1,12 @@
 import { readFile, writeFile, mkdir, copyFile, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SCENARIOS, FRAMEWORKS, SAMPLES } from '../bench/scenarios.mjs';
+import { SCENARIOS, FRAMEWORKS, SAMPLES, MEMORY_SCENARIOS, MEMORY_SAMPLES } from '../bench/scenarios.mjs';
 
 const __root = fileURLToPath(new URL('..', import.meta.url));
 const SUMMARY = join(__root, 'metrics', 'summary.json');
 const BUNDLE = join(__root, 'metrics', 'bundle-size.json');
-const SITE = join(__root, 'site');
+const SITE = join(__root, 'docs');
 
 const NOISE_THRESHOLD = 0.2; // iqr / p50 > this → cell is flagged noisy
 
@@ -16,6 +16,8 @@ function esc(s) {
 
 function fmt(n) { return n == null ? '—' : n.toFixed(1); }
 function fmtKB(n) { return n == null ? '—' : (n / 1024).toFixed(1); }
+function fmtMB(n) { return n == null ? '—' : (n / 1024 / 1024).toFixed(1); }
+function fmtInt(n) { return n == null ? '—' : String(Math.round(n)); }
 
 function pickColor(id) {
   return { react:'#61dafb', svelte:'#ff3e00', imba:'#6610f2', ripple:'#10b981', vue:'#42b883', 'vue-vapor':'#35495e' }[id] || '#888';
@@ -33,6 +35,33 @@ function renderBundleTable(bundle, t) {
   for (const id of ids) {
     const b = bundle.simple[id];
     out += `<tr><td>${esc(id)}</td><td>${fmtKB(b.raw)}</td><td>${fmtKB(b.gz)}</td><td>${fmtKB(b.br)}</td></tr>`;
+  }
+  return out + '</tbody></table>';
+}
+
+function renderMemoryTable(summary, t) {
+  if (!summary.memory || !Object.keys(summary.memory).length) return '';
+  const ids = FRAMEWORKS.map(f => f.id).filter(id => summary.memory[id]);
+  ids.sort((a, b) => {
+    const ah = summary.memory[a]?.['run-1k']?.usedJSHeapSize?.p50 ?? Infinity;
+    const bh = summary.memory[b]?.['run-1k']?.usedJSHeapSize?.p50 ?? Infinity;
+    return ah - bh;
+  });
+
+  let out = `<table class="bench"><thead><tr><th>${esc(t.memoryFramework)}</th>`;
+  for (const sc of MEMORY_SCENARIOS) out += `<th>${esc(t.memoryCol(sc.id))}</th>`;
+  out += '</tr></thead><tbody>';
+  for (const id of ids) {
+    out += `<tr><td>${esc(id)}</td>`;
+    for (const sc of MEMORY_SCENARIOS) {
+      const s = summary.memory[id]?.[sc.id];
+      const heap = fmtMB(s?.usedJSHeapSize?.p50);
+      const nodes = fmtInt(s?.nodes?.p50);
+      const listeners = fmtInt(s?.jsEventListeners?.p50);
+      const title = s ? `n=${s.n}, heap=${heap}MB, nodes=${nodes}, listeners=${listeners}` : '';
+      out += `<td title="${esc(title)}">${heap} / ${nodes}</td>`;
+    }
+    out += '</tr>';
   }
   return out + '</tbody></table>';
 }
@@ -136,8 +165,12 @@ const I18N = {
     bundleRaw: 'raw (KB)',
     bundleGzip: 'gzip (KB)',
     bundleBr: 'br (KB)',
+    memoryHead: 'Memory',
+    memoryLegend: (n) => `P50 over ${n} fresh page loads. Each cell is <code>used JS heap MB / DOM nodes</code> after forced GC; hover for listener counts. Mirrors the memory families used by <a href="https://github.com/krausest/js-framework-benchmark">js-framework-benchmark</a>.`,
+    memoryFramework: 'framework',
+    memoryCol: (id) => id,
     resultsHead: 'Results',
-    resultsLegend: (th) => `Yellow cells (⚠) have <code>iqr/p50 &gt; ${th}</code> — the middle 50% of samples spans more than ${th*100}% of the median, so the number is too noisy to compare precisely on a single-runner CI. Hover a cell for the raw spread.`,
+    resultsLegend: (th) => `Yellow cells (⚠) have <code>iqr/p50 &gt; ${th}</code> — the middle 50% of samples spans more than ${th*100}% of the median, so the number is too noisy to compare precisely on a single local runner. Hover a cell for the raw spread.`,
     colScenario: 'scenario',
     colHead: (id) => `${id} P50 / P95 (ms)`,
     scoreLabel: 'score',
@@ -161,8 +194,12 @@ const I18N = {
     bundleRaw: '原始 (KB)',
     bundleGzip: 'gzip (KB)',
     bundleBr: 'br (KB)',
+    memoryHead: '内存',
+    memoryLegend: (n) => `每项 ${n} 次全新页面加载后取 P50。单元格格式为 <code>used JS heap MB / DOM nodes</code>，采样前强制 GC；悬停可看事件监听器数量。维度对齐 <a href="https://github.com/krausest/js-framework-benchmark">js-framework-benchmark</a> 的 memory 系列。`,
+    memoryFramework: '框架',
+    memoryCol: (id) => id,
     resultsHead: '结果',
-    resultsLegend: (th) => `黄色单元格（⚠）表示 <code>iqr/p50 &gt; ${th}</code>——中间 50% 样本的跨度超过中位数的 ${th*100}%，单机 CI 下该数字不够稳定，不能精确对比。悬停单元格可看原始离散度。`,
+    resultsLegend: (th) => `黄色单元格（⚠）表示 <code>iqr/p50 &gt; ${th}</code>——中间 50% 样本的跨度超过中位数的 ${th*100}%，单机本地 runner 下该数字不够稳定，不能精确对比。悬停单元格可看原始离散度。`,
     colScenario: '场景',
     colHead: (id) => `${id} P50 / P95 (ms)`,
     scoreLabel: '得分',
@@ -208,6 +245,9 @@ function renderPage(lang, summary, bundle) {
   const bundleSection = bundle
     ? `<h2>${esc(t.bundleHead)}</h2><p class="legend">${t.bundleLegend}</p>${renderBundleTable(bundle, t)}<p class="legend">${t.bundleNote}</p>`
     : '';
+  const memorySection = summary.memory && Object.keys(summary.memory).length
+    ? `<h2>${esc(t.memoryHead)}</h2><p class="legend">${t.memoryLegend(MEMORY_SAMPLES)}</p>${renderMemoryTable(summary, t)}`
+    : '';
   const langSwitch = `<a class="lang-switch" href="${t.other.href}">${esc(t.other.label)}</a>`;
 
   return `<!doctype html>
@@ -225,6 +265,7 @@ ${langSwitch}
 </div>
 <p>${t.intro(SAMPLES)}</p>
 ${bundleSection}
+${memorySection}
 <h2>${esc(t.resultsHead)}</h2>
 <p class="legend">${t.resultsLegend(NOISE_THRESHOLD)}</p>
 ${renderTable(summary, t)}

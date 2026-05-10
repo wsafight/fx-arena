@@ -11,6 +11,7 @@
   const api = {
     ready: true,
     run(n) { flushSync(() => { resetIds(); selectedId = -1; rows = buildRows(n); }); },
+    replace(n) { flushSync(() => { selectedId = -1; rows = buildRows(n); }); },
     append(n) { flushSync(() => { rows = rows.concat(buildRows(n)); }); },
     updateEvery10th() {
       flushSync(() => {

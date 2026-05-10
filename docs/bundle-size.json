@@ -1,0 +1,89 @@
+{
+  "generatedAt": "2026-05-10T03:04:31.672Z",
+  "simple": {
+    "react": {
+      "raw": 192145,
+      "gz": 60122,
+      "br": 51665,
+      "files": [
+        {
+          "path": "assets/index-BpxFLGmy.js",
+          "raw": 192145,
+          "gz": 60122,
+          "br": 51665
+        }
+      ]
+    },
+    "svelte": {
+      "raw": 33942,
+      "gz": 13557,
+      "br": 12314,
+      "files": [
+        {
+          "path": "assets/index-TEXobsvc.js",
+          "raw": 33942,
+          "gz": 13557,
+          "br": 12314
+        }
+      ]
+    },
+    "imba": {
+      "raw": 32489,
+      "gz": 10882,
+      "br": 9806,
+      "files": [
+        {
+          "path": "assets/main.LZACYK4Y.js",
+          "raw": 32433,
+          "gz": 10806,
+          "br": 9746
+        },
+        {
+          "path": "assets/main.6JO4TR5Y.css",
+          "raw": 56,
+          "gz": 76,
+          "br": 60
+        }
+      ]
+    },
+    "ripple": {
+      "raw": 21943,
+      "gz": 8974,
+      "br": 8096,
+      "files": [
+        {
+          "path": "assets/index-UGlXt5lq.js",
+          "raw": 21943,
+          "gz": 8974,
+          "br": 8096
+        }
+      ]
+    },
+    "vue": {
+      "raw": 65050,
+      "gz": 25221,
+      "br": 22930,
+      "files": [
+        {
+          "path": "assets/index-B0L6OGbe.js",
+          "raw": 65050,
+          "gz": 25221,
+          "br": 22930
+        }
+      ]
+    },
+    "vue-vapor": {
+      "raw": 55152,
+      "gz": 20656,
+      "br": 18807,
+      "files": [
+        {
+          "path": "assets/index-PAwnNvVk.js",
+          "raw": 55152,
+          "gz": 20656,
+          "br": 18807
+        }
+      ]
+    }
+  }
+}

@@ -10,6 +10,7 @@ export component App() {
   const api = {
     ready: true,
     run(n: number) { flushSync(() => { resetIds(); selectedId = -1; rows = buildRows(n); }); },
+    replace(n: number) { flushSync(() => { selectedId = -1; rows = buildRows(n); }); },
     append(n: number) { flushSync(() => { rows = rows.concat(buildRows(n)); }); },
     updateEvery10th() {
       flushSync(() => {

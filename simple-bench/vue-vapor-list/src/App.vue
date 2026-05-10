@@ -8,6 +8,7 @@ const selectedId = ref(-1);
 window.__simpleBench = {
   ready: false,
   async run(n) { resetIds(); selectedId.value = -1; rows.value = buildRows(n); await nextTick(); },
+  async replace(n) { selectedId.value = -1; rows.value = buildRows(n); await nextTick(); },
   async append(n) { rows.value = rows.value.concat(buildRows(n)); await nextTick(); },
   async updateEvery10th() {
     const next = rows.value.slice();

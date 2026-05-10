@@ -4,7 +4,7 @@
 
 ## 〇、文档性质
 
-本文是**项目的需求与方案**,不是对比结论。交付物是代码仓库 + 自动化报告,不是一篇预先写死数字的文章——真实数字由 CI 产出。
+本文是**项目的需求与方案**,不是对比结论。交付物是代码仓库 + 自动化报告,不是一篇预先写死数字的文章——真实数字由本地 runner 产出。
 
 ## Phase 1 完成状态 (2026/05/10)
 
@@ -15,7 +15,7 @@
 - [x] `bench/runner.mjs`:Playwright + `performance.now`,10 次采样丢首次,`--expose-gc`
 - [x] `bench/aggregate.mjs`:P50 / P95 / IQR 汇总到 `metrics/summary.json`
 - [x] `report/render.mjs`:静态 HTML 报告(表格 + SVG 条形图 + 环境指纹 + JSON 下载)
-- [x] `.github/workflows/bench.yml`:install → build → bench → render → GitHub Pages 部署
+- [x] `report/render.mjs`:本地 render 后写入 `docs/`,由 GitHub Pages 的 `main` / `docs` 自动部署
 - [x] `VERSIONS.md`:版本锁 + Ripple 0.3.x 接入笔记(插件 named import、`.tsrx` 扩展名)
 - [x] 本地四端 `vite build` / `imba build` 全部通过
 
@@ -37,7 +37,7 @@
 
 ### 1.1 一句话
 
-**用同一个复杂中后台业务 ProjectOps 在 React / Svelte 5 / Imba / Ripple 各实现一遍,同时保留一套简单列表基准,由 CI 采集性能、包体、代码量、心智成本,产出可复现报告。**
+**用同一个复杂中后台业务 ProjectOps 在 React / Svelte 5 / Imba / Ripple 各实现一遍,同时保留一套简单列表基准,由本地 runner 采集性能、包体、代码量、心智成本,产出可复现报告。**
 
 ### 1.2 动机
 
@@ -61,7 +61,7 @@
 
 ### 1.4 边界
 
-- **In**:4 个 ProjectOps 应用、1 套简单性能基准、1 套复杂业务 benchmark、自动生成的 README、CI 流水线。
+- **In**:4 个 ProjectOps 应用、1 套简单性能基准、1 套复杂业务 benchmark、自动生成的报告、本地部署脚本。
 - **Out**:SSR / SEO、移动端、长期维护性调研、招聘市场分析。
 
 ---
@@ -96,7 +96,6 @@ framework-compare/
 ├── report/
 │   ├── template.md.hbs       # Handlebars 模板
 │   └── render.mjs            # 合并 metrics/*.json → README.md
-├── .github/workflows/bench.yml  # PR 触发 + 每周 cron
 ├── package.json              # Bun workspaces + 根脚本
 └── README.md                 # 由 render.mjs 自动覆写
 ```
@@ -107,7 +106,7 @@ framework-compare/
 - **构建**:由 Bun 驱动,应用实际走 Vite 7(Imba 用官方插件,Ripple 用 `@ripple-ts/vite-plugin`)。
 - **语言**:TS 5.x;Imba 用自带语言能力;Ripple 用 TSRX。
 - **测试 / E2E**:Bun 作统一入口,浏览器自动化用 Playwright 1.x(无头 Chromium,固定版本防抖动)。
-- **CI**:GitHub Actions + 固定 runner(`ubuntu-latest` + `perf` 标签节点)。
+- **部署**:本地生成 `docs/`,提交后由 GitHub Pages 的 `main` / `docs` 托管。
 - **报告**:Bun 执行脚本合并 JSON → Markdown 表格 + Mermaid 雷达图。
 
 ### 2.3 版本锁
@@ -116,12 +115,11 @@ React / Svelte / Imba **必须**用各自 stable latest,写入 `VERSIONS.md` 并
 
 ### 2.4 Bun 脚本约定
 
-根 `package.json` 暴露统一入口,CI 与本地均只调用 Bun:
+根 `package.json` 暴露统一入口,本地采集与部署均只调用 Bun:
 
 | 命令 | 作用 |
 |------|------|
 | `bun install` | 安装依赖,生成/更新 `bun.lock` |
-| `bun ci` | CI 按 lockfile 做可复现安装 |
 | `bun --filter <app> run dev` | 启动某个应用 |
 | `bun run build` | 构建全部应用 |
 | `bun run test` | 单元测试 + 规约测试 |
@@ -130,7 +128,9 @@ React / Svelte / Imba **必须**用各自 stable latest,写入 `VERSIONS.md` 并
 | `bun run bench:complex` | ProjectOps 复杂基准 |
 | `bun run bench` | simple + complex + aggregate |
 | `bun run metrics` | 采集包体 / LOC / build time |
+| `bun run report:local` | build → bench → metrics:bundle → report:render |
 | `bun run report:render` | 渲染 README 报告 |
+| `bun run deploy` | 本地重新采集并写入 `docs/` |
 
 Vite、Playwright、cloc、hyperfine 都由 Bun 脚本内部调用,不作为用户入口。若某插件暂不兼容 Bun runtime,脚本可显式调用对应 CLI,但入口仍保持 `bun run <script>`。
 
@@ -225,15 +225,30 @@ ProjectOps 是一个"项目协作 + 工单运营"工作台,模拟真实中后台
 
 | 场景 ID | 操作 | 观测点 |
 |---------|------|--------|
+| `create-100` | 创建 100 行 | 小规模创建成本,避免 1k/10k 掩盖固定开销 |
 | `create-1k` / `create-10k` | 创建 1k / 10k 行(id、label、按钮) | 批量创建与首次渲染 |
+| `replace-1k` | 已有 1k 行后替换为新的 1k 行 | keyed 全量替换 |
 | `append-1k` | 已有 1k 行后追加 1k | 追加成本 |
-| `update-every-10th` | 每隔 10 行更新 label | 细粒度更新 |
+| `append-1k-to-10k` | 已有 10k 行后追加 1k | 大表追加成本 |
+| `update-every-10th` / `update-every-10th-10k` | 每隔 10 行更新 label | 细粒度更新 |
 | `select-row` | 点击切换 selected 样式 | 单节点更新 |
 | `swap-rows` | 第 2 行与第 998 行交换 | 列表重排 |
 | `remove-row` | 删除中间一行 | keyed diff + 卸载 |
-| `clear-10k` | 清空 10k 行 | 批量卸载 |
+| `clear-1k` / `clear-10k` | 清空 1k / 10k 行 | 批量卸载 |
 
-四端暴露同名 `window.__simpleBench` hook,数据写入 `metrics/raw/simple/`。简单性能只解释"基础能力",**不能直接推导复杂业务选型**。
+四端暴露同名 `window.__simpleBench` hook,数据写入 `metrics/raw/simple/`。Phase 1 的 CPU 场景对齐 [krausest/js-framework-benchmark](https://github.com/krausest/js-framework-benchmark) 可直接迁移的 keyed duration 维度,并保留本项目的小规模固定开销探针。简单性能只解释"基础能力",**不能直接推导复杂业务选型**。
+
+简单内存维度同样对齐 js-framework-benchmark 的 memory 系列,单独采集并在报告中与 CPU 结果分开展示:
+
+| 场景 ID | 操作 | 观测点 |
+|---------|------|--------|
+| `ready` | 应用加载完成后不创建数据 | 运行时基线内存、DOM 节点 |
+| `run-1k` | 创建 1k 行后强制 GC | 1k 行稳定态 heap / DOM |
+| `update-1k-x5` | 1k 行连续更新 5 次后强制 GC | 更新后的残留内存 |
+| `replace-1k-x5` | 1k 行连续替换 5 次后强制 GC | keyed 替换后的残留内存 |
+| `repeated-clear-1k-x5` | 创建并清空 1k 行 5 次后强制 GC | 批量卸载后的残留内存 |
+
+暂不在 Phase 1 混入 Lighthouse startup 指标。启动耗时、main thread work、TTI/TBT 适合新增 `bench/startup.mjs` 独立 suite,避免和同步 DOM 操作耗时混成一个分数。
 
 ### 4.3 采集流程
 
@@ -252,10 +267,10 @@ runner.mjs
 
 **反抖动**:
 
-- 固定 Chromium 版本;CI runner 用 `cpupower` 设 performance。
+- 固定 Chromium 版本;本地采集时尽量关闭重负载后台任务,必要时固定性能模式。
 - 每次采样前 `gc()`(启动 `--js-flags=--expose-gc`)。
 - 丢弃首次(JIT 预热),只报 **P50 / P95 / IQR**,不报 mean。
-- CI 并发度 = 1。
+- 采集并发度 = 1。
 
 ### 4.4 其它指标
 
@@ -274,7 +289,7 @@ runner.mjs
 - 各端关键片段对照(聚合自 `apps/*/README.snippets.md`)
 - 环境指纹(Bun / Chromium 版本、commit SHA、runner 型号、采集时间)
 
-输出为 `README.md`,CI 在 main 分支自动 commit(附 `[skip ci]`)。
+输出为 `docs/index.html` 与 `docs/zh.html`,提交并推送后由 GitHub Pages 自动部署。
 
 ---
 
@@ -322,7 +337,7 @@ runner.mjs
 }
 ```
 
-报告用并排条形图呈现,**数字由 CI 填充,本文档不预判**。
+报告用并排条形图呈现,**数字由本地 runner 填充,本文档不预判**。
 
 ---
 
@@ -332,12 +347,12 @@ runner.mjs
 
 | 周 | 目标 | 产出 |
 |----|------|------|
-| W1 | 仓库骨架 + SPEC 冻结 + shared CSS + shared-e2e 骨架 | 可跑空壳 CI |
+| W1 | 仓库骨架 + SPEC 冻结 + shared CSS + shared-e2e 骨架 | 可跑本地空壳流程 |
 | W2 | simple-bench 四端打通 + React ProjectOps 核心工作流 | 基线 1 |
 | W3 | Svelte 5 ProjectOps 打通 | 基线 2,首份复杂 bench |
 | W4 | Imba ProjectOps 打通 | 三端对比可出 |
 | W5 | Ripple ProjectOps 打通(生态缺失自补小工具并记代价) | 四端齐 |
-| W6 | 报告模板、CI 稳定性调优、文章化 README | v1.0 release |
+| W6 | 报告模板、本地采集稳定性调优、文章化 README | v1.0 release |
 
 ### 6.2 风险与应对
 
@@ -345,7 +360,7 @@ runner.mjs
 |------|------|------|
 | Ripple API / 工具链变动 | 返工 | 锁版本,记 TSRX、插件、扩展名与迁移笔记,不追新 |
 | Imba 缺组件(如 DnD) | LOC 膨胀 | 记为"生态代价",不视为不公平 |
-| CI runner 抖动大 | 性能数据不可信 | 采样增至 20,或改自托管 runner |
+| 本地 runner 抖动大 | 性能数据不可信 | 采样增至 20,固定采集机器与后台负载,必要时换专用机器 |
 | 四端 UI 难以一致 | 可比性被质疑 | 只保功能 + token 一致,不追像素级 |
 | 共享 CSS 掩盖差异 | LOC 误读 | CSS 单独计量;组件/DOM/状态/事件不得共享 |
 | ProjectOps 过复杂,工期膨胀 | 难收敛 | SPEC 分 must/should;v1 只做 must,趋势图/附件预览用轻量 mock |
@@ -354,8 +369,8 @@ runner.mjs
 ### 6.3 验收清单
 
 - [ ] 四端全部通过 `shared-e2e` 用例 *(Phase 2)*
-- [ ] `bench/simple` 与 `bench/complex` 在 CI 连跑 3 次,P50 波动 < 10% *(Phase 1 只跑 simple,连跑稳定性待 CI 历史数据验证)*
-- [x] `README.md` 由 `render.mjs` 自动生成且表格可读 *(输出为 `site/index.html`,经 mock summary 渲染验证)*
+- [ ] `bench/simple` 与 `bench/complex` 在同一台本地机器连跑 3 次,P50 波动 < 10% *(Phase 1 只跑 simple,连跑稳定性待本地历史数据验证)*
+- [x] `docs/index.html` 由 `render.mjs` 自动生成且表格可读 *(输出为 `docs/index.html`,经本地 summary 渲染验证)*
 - [x] `VERSIONS.md` 列出所有框架与关键依赖版本
 - [x] `bun install && bun run bench && bun run report:render` 一键可复现
 
@@ -369,4 +384,3 @@ runner.mjs
    - 是否加 Vue 3 / SolidJS 作对照?(倾向:v1 不加,v1.1 再看。)
    - Ripple 是否值得单独写一篇"新项目 / 早期生态代价"报告?
    - ProjectOps 的趋势图、附件预览放进 v1 must,还是 v1.1 扩展?
-

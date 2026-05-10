@@ -34,6 +34,9 @@ window.__simpleBench = {
     resetIds();
     flushSync(() => { apiRef.current.setSelectedId(-1); apiRef.current.setRows(buildRows(n)); });
   },
+  replace(n) {
+    flushSync(() => { apiRef.current.setSelectedId(-1); apiRef.current.setRows(buildRows(n)); });
+  },
   append(n) {
     flushSync(() => apiRef.current.setRows(r => r.concat(buildRows(n))));
   },

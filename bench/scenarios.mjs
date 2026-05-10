@@ -22,8 +22,11 @@ export const SCENARIOS = [
   { id: 'create-100',       setup: (b) => b.clear(),            run: (b) => b.run(100) },
   { id: 'create-1k',        setup: (b) => b.clear(),            run: (b) => b.run(1000) },
   { id: 'create-10k',       setup: (b) => b.clear(),            run: (b) => b.run(10000) },
+  { id: 'replace-1k',       setup: (b) => b.run(1000),          run: (b) => b.replace(1000) },
   { id: 'append-1k',        setup: (b) => b.run(1000),          run: (b) => b.append(1000) },
+  { id: 'append-1k-to-10k', setup: (b) => b.run(10000),         run: (b) => b.append(1000) },
   { id: 'update-every-10th',setup: (b) => b.run(1000),          run: (b) => b.updateEvery10th() },
+  { id: 'update-every-10th-10k',setup: (b) => b.run(10000),     run: (b) => b.updateEvery10th() },
   { id: 'select-row',       setup: (b) => b.run(1000),          run: (b) => b.select(500) },
   { id: 'swap-rows',        setup: (b) => b.run(1000),          run: (b) => b.swap() },
   { id: 'remove-row',       setup: (b) => b.run(1000),          run: (b) => b.remove(500) },
@@ -33,3 +36,12 @@ export const SCENARIOS = [
 
 export const SAMPLES = 20;
 export const WARMUP = 3;
+export const MEMORY_SAMPLES = 5;
+
+export const MEMORY_SCENARIOS = [
+  { id: 'ready',                 run: async () => {} },
+  { id: 'run-1k',                run: async (b) => { await b.run(1000); } },
+  { id: 'update-1k-x5',          run: async (b) => { await b.run(1000); for (let i = 0; i < 5; i++) await b.updateEvery10th(); } },
+  { id: 'replace-1k-x5',         run: async (b) => { await b.run(1000); for (let i = 0; i < 5; i++) await b.replace(1000); } },
+  { id: 'repeated-clear-1k-x5',  run: async (b) => { for (let i = 0; i < 5; i++) { await b.run(1000); await b.clear(); } } }
+];

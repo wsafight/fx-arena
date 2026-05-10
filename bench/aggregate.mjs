@@ -33,23 +33,52 @@ function stats(samples) {
   return { n: samples.length, nAfterTrim: trimmed.length, p50, p95, iqr, iqrRatio, min, max };
 }
 
+function numericStats(samples) {
+  const vals = samples.filter(n => typeof n === 'number' && Number.isFinite(n));
+  if (!vals.length) return null;
+  const sorted = vals.slice().sort((a, b) => a - b);
+  const p50 = quantile(sorted, 0.5);
+  const p95 = quantile(sorted, 0.95);
+  const iqr = quantile(sorted, 0.75) - quantile(sorted, 0.25);
+  return { n: sorted.length, p50, p95, iqr, min: sorted[0], max: sorted[sorted.length - 1] };
+}
+
+function memoryStats(samples) {
+  if (!samples?.length) return null;
+  return {
+    n: samples.length,
+    usedJSHeapSize: numericStats(samples.map(s => s.usedJSHeapSize)),
+    totalJSHeapSize: numericStats(samples.map(s => s.totalJSHeapSize)),
+    nodes: numericStats(samples.map(s => s.nodes)),
+    documents: numericStats(samples.map(s => s.documents)),
+    jsEventListeners: numericStats(samples.map(s => s.jsEventListeners))
+  };
+}
+
 async function main() {
   let files = [];
   try { files = (await readdir(RAW_DIR)).filter(f => f.endsWith('.json')); } catch {}
 
   const frameworks = {};
+  const memory = {};
   for (const f of files) {
     const data = JSON.parse(await readFile(join(RAW_DIR, f), 'utf8'));
     const agg = {};
     for (const [sid, samples] of Object.entries(data.scenarios)) agg[sid] = stats(samples);
     frameworks[data.framework] = agg;
+    if (data.memory) {
+      const memoryAgg = {};
+      for (const [sid, samples] of Object.entries(data.memory)) memoryAgg[sid] = memoryStats(samples);
+      memory[data.framework] = memoryAgg;
+    }
   }
 
   const summary = {
     generatedAt: new Date().toISOString(),
     commit: process.env.GITHUB_SHA || null,
     runner: process.env.RUNNER_NAME || null,
-    simple: frameworks
+    simple: frameworks,
+    memory
   };
   await mkdir(join(__root, 'metrics'), { recursive: true });
   await writeFile(OUT, JSON.stringify(summary, null, 2));
