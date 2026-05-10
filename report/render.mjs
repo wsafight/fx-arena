@@ -41,19 +41,21 @@ function renderBundleTable(bundle, t) {
 
 function renderMemoryTable(summary, t) {
   if (!summary.memory || !Object.keys(summary.memory).length) return '';
-  const ids = FRAMEWORKS.map(f => f.id).filter(id => summary.memory[id]);
-  ids.sort((a, b) => {
-    const ah = summary.memory[a]?.['run-1k']?.usedJSHeapSize?.p50 ?? Infinity;
-    const bh = summary.memory[b]?.['run-1k']?.usedJSHeapSize?.p50 ?? Infinity;
-    return ah - bh;
-  });
+  const { ids } = rankIds(summary);
+  const memoryIds = ids.filter(id => summary.memory[id]);
+  const n = memoryIds.length;
+  const getMemoryScore = (id) => MEMORY_SCENARIOS.reduce((sum, sc) => {
+    const vals = memoryIds.map(i => summary.memory[i]?.[sc.id]?.usedJSHeapSize?.p50 ?? Infinity);
+    const sorted = [...vals].sort((x, y) => x - y);
+    return sum + n - sorted.indexOf(summary.memory[id]?.[sc.id]?.usedJSHeapSize?.p50 ?? Infinity);
+  }, 0);
 
-  let out = `<table class="bench"><thead><tr><th>${esc(t.memoryFramework)}</th>`;
-  for (const sc of MEMORY_SCENARIOS) out += `<th>${esc(t.memoryCol(sc.id))}</th>`;
+  let out = `<table class="bench"><thead><tr><th>${esc(t.memoryScenario)}</th>`;
+  for (const id of memoryIds) out += `<th>${esc(t.memoryCol(id))}</th>`;
   out += '</tr></thead><tbody>';
-  for (const id of ids) {
-    out += `<tr><td>${esc(id)}</td>`;
-    for (const sc of MEMORY_SCENARIOS) {
+  for (const sc of MEMORY_SCENARIOS) {
+    out += `<tr><td>${esc(sc.id)}</td>`;
+    for (const id of memoryIds) {
       const s = summary.memory[id]?.[sc.id];
       const heap = fmtMB(s?.usedJSHeapSize?.p50);
       const nodes = fmtInt(s?.nodes?.p50);
@@ -63,6 +65,9 @@ function renderMemoryTable(summary, t) {
     }
     out += '</tr>';
   }
+  out += `<tr class="score-row"><td>${esc(t.memoryScoreLabel)} <span class="score-help" data-tip="${esc(t.memoryScoreTooltip)}">?</span></td>`;
+  for (const id of memoryIds) out += `<td><strong>${getMemoryScore(id)}</strong></td>`;
+  out += '</tr>';
   return out + '</tbody></table>';
 }
 
@@ -166,9 +171,11 @@ const I18N = {
     bundleGzip: 'gzip (KB)',
     bundleBr: 'br (KB)',
     memoryHead: 'Memory',
-    memoryLegend: (n) => `P50 over ${n} fresh page loads. Each cell is <code>used JS heap MB / DOM nodes</code> after forced GC; hover for listener counts. Mirrors the memory families used by <a href="https://github.com/krausest/js-framework-benchmark">js-framework-benchmark</a>.`,
-    memoryFramework: 'framework',
-    memoryCol: (id) => id,
+    memoryLegend: (n) => `P50 over ${n} fresh page loads. Columns use the same left-to-right order as the time results below. Each cell is <code>used JS heap MB / DOM nodes</code> after forced GC; hover for listener counts.`,
+    memoryScenario: 'scenario',
+    memoryCol: (id) => `${id} heap / nodes`,
+    memoryScoreLabel: 'memory score',
+    memoryScoreTooltip: 'Per memory scenario: lowest used JS heap gets N points (N = number of frameworks), highest gets 1. Higher total = lower heap overall.',
     resultsHead: 'Results',
     resultsLegend: (th) => `Yellow cells (⚠) have <code>iqr/p50 &gt; ${th}</code> — the middle 50% of samples spans more than ${th*100}% of the median, so the number is too noisy to compare precisely on a single local runner. Hover a cell for the raw spread.`,
     colScenario: 'scenario',
@@ -195,9 +202,11 @@ const I18N = {
     bundleGzip: 'gzip (KB)',
     bundleBr: 'br (KB)',
     memoryHead: '内存',
-    memoryLegend: (n) => `每项 ${n} 次全新页面加载后取 P50。单元格格式为 <code>used JS heap MB / DOM nodes</code>，采样前强制 GC；悬停可看事件监听器数量。维度对齐 <a href="https://github.com/krausest/js-framework-benchmark">js-framework-benchmark</a> 的 memory 系列。`,
-    memoryFramework: '框架',
-    memoryCol: (id) => id,
+    memoryLegend: (n) => `每项 ${n} 次全新页面加载后取 P50。列顺序与下方耗时结果一致。单元格格式为 <code>used JS heap MB / DOM nodes</code>，采样前强制 GC；悬停可看事件监听器数量。`,
+    memoryScenario: '场景',
+    memoryCol: (id) => `${id} heap / nodes`,
+    memoryScoreLabel: '内存得分',
+    memoryScoreTooltip: '每个内存场景：used JS heap 最低得 N 分（N = 框架数），最高得 1 分。总分越高，整体 heap 越低。',
     resultsHead: '结果',
     resultsLegend: (th) => `黄色单元格（⚠）表示 <code>iqr/p50 &gt; ${th}</code>——中间 50% 样本的跨度超过中位数的 ${th*100}%，单机本地 runner 下该数字不够稳定，不能精确对比。悬停单元格可看原始离散度。`,
     colScenario: '场景',
